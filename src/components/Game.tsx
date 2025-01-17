@@ -65,63 +65,63 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
   // Real-time subscriptions
   useEffect(() => {
     const playersSubscription = supabase
-  .channel('game-players')
-  .on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'players',
-      filter: `lobby_code=eq.${lobbyCode}`
-    },
-    async (payload) => {
-      // Get the latest list of players
-      const { data: updatedPlayers } = await supabase
-        .from('players')
-        .select('*')
-        .eq('lobby_code', lobbyCode);
+      .channel('game-players')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'players',
+          filter: `lobby_code=eq.${lobbyCode}`
+        },
+        async (payload) => {
+          // Get the latest list of players
+          const { data: updatedPlayers } = await supabase
+            .from('players')
+            .select('*')
+            .eq('lobby_code', lobbyCode);
 
-      if (updatedPlayers) {
-        setPlayers(updatedPlayers);
+          if (updatedPlayers) {
+            setPlayers(updatedPlayers);
 
-        // Check if a player left
-        if (updatedPlayers.length < players.length) {
-          setPlayerLeft(true);
-          toast.error('A player has left the game');
+            // Check if a player left
+            if (updatedPlayers.length < players.length) {
+              setPlayerLeft(true);
+              toast.error('A player has left the game');
+            }
+
+            // 1) Fetch the current lobby status first
+            const { data: lobbyRes } = await supabase
+              .from('lobbies')
+              .select('game_status')
+              .eq('code', lobbyCode)
+              .single();
+
+            // 2) If the lobby is NOT finished, check if all players are ready to start
+            if (
+              lobbyRes?.game_status !== 'finished' &&
+              updatedPlayers.length >= 2 &&
+              updatedPlayers.length <= maxPlayers &&
+              updatedPlayers.every((p) => p.ready_to_start)
+            ) {
+              await supabase
+                .from('lobbies')
+                .update({ game_status: 'playing' })
+                .eq('code', lobbyCode);
+            }
+
+            // 3) If the lobby is truly in "finished" AND everyone wants to play again,
+            //    then call handleStartNewGame().
+            if (
+              lobbyRes?.game_status === 'finished' &&
+              updatedPlayers.every((p) => p.wants_to_play_again)
+            ) {
+              handleStartNewGame();
+            }
+          }
         }
-
-        // 1) Fetch the current lobby status first
-        const { data: lobbyRes } = await supabase
-          .from('lobbies')
-          .select('game_status')
-          .eq('code', lobbyCode)
-          .single();
-
-        // 2) If the lobby is NOT finished, check if all players are ready to start
-        if (
-          lobbyRes?.game_status !== 'finished' && 
-          updatedPlayers.length >= 2 &&
-          updatedPlayers.length <= maxPlayers &&
-          updatedPlayers.every((p) => p.ready_to_start)
-        ) {
-          await supabase
-            .from('lobbies')
-            .update({ game_status: 'playing' })
-            .eq('code', lobbyCode);
-        }
-
-        // 3) If the lobby is truly in "finished" AND everyone wants to play again,
-        //    then call handleStartNewGame().
-        if (
-          lobbyRes?.game_status === 'finished' &&
-          updatedPlayers.every((p) => p.wants_to_play_again)
-        ) {
-          handleStartNewGame();
-        }
-      }
-    }
-  )
-  .subscribe();
+      )
+      .subscribe();
 
     const lobbySubscription = supabase
       .channel('game-lobby')
@@ -169,7 +169,7 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
             // Check if all players submitted their words
             if (currentRoundWords.length === players.length) {
               // Check if all words match
-              const allWordsMatch = currentRoundWords.every(w => 
+              const allWordsMatch = currentRoundWords.every(w =>
                 w.word.toLowerCase() === currentRoundWords[0].word.toLowerCase()
               );
 
@@ -232,10 +232,10 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
     const normalizedWord = currentWord.toLowerCase().trim();
 
     // Check if the word has been used in previous rounds
-    const wordUsedInPreviousRounds = allWords.some(w => 
+    const wordUsedInPreviousRounds = allWords.some(w =>
       w.round < currentRound && w.word.toLowerCase() === normalizedWord
     );
-    
+
     if (wordUsedInPreviousRounds) {
       toast.error('This word has been used in a previous round. Try a different word!');
       return;
@@ -303,8 +303,8 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
 
       await supabase
         .from('players')
-        .update({ 
-          ready: false, 
+        .update({
+          ready: false,
           current_word: null,
           wants_to_play_again: false,
           ready_to_start: false
@@ -348,7 +348,9 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
       return acc;
     }, {} as Record<number, Word[]>);
 
+    // Sort the rounds in descending order
     return Object.entries(groupedWords)
+      .sort((a, b) => Number(b[0]) - Number(a[0])) // Sort by round in descending order
       .filter(([round]) => Number(round) < currentRound || allPlayersSubmitted)
       .map(([round, words]) => (
         <div key={round} className="mb-4 p-4 bg-gray-50 rounded-lg">
@@ -514,13 +516,13 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
                 disabled={currentPlayer?.wants_to_play_again}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
               >
-                {currentPlayer?.wants_to_play_again 
-                  ? 'Waiting for other players...' 
+                {currentPlayer?.wants_to_play_again
+                  ? 'Waiting for other players...'
                   : 'Play Again'}
               </button>
               {players.some(p => p.wants_to_play_again) && (
                 <p className="text-sm text-gray-600">
-                  {players.filter(p => p.wants_to_play_again).map(p => p.nickname).join(', ')} 
+                  {players.filter(p => p.wants_to_play_again).map(p => p.nickname).join(', ')}
                   {players.filter(p => p.wants_to_play_again).length === 1 ? ' wants' : ' want'} to play again
                 </p>
               )}
