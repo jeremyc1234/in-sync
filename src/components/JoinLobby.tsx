@@ -21,10 +21,10 @@ export default function JoinLobby({ onJoin }: JoinLobbyProps) {
     setLoading(true);
 
     try {
-      // Check if lobby exists and has less than 2 players
+      // Check if lobby exists and has space for more players
       const { data: lobby } = await supabase
         .from('lobbies')
-        .select('code, players!inner(*)')
+        .select('code, max_players, players!inner(*)')
         .eq('code', lobbyCode.toUpperCase())
         .single();
 
@@ -33,7 +33,7 @@ export default function JoinLobby({ onJoin }: JoinLobbyProps) {
         return;
       }
 
-      if (lobby.players.length >= 2) {
+      if (lobby.players.length >= lobby.max_players) {
         toast.error('Lobby is full');
         return;
       }
@@ -46,12 +46,6 @@ export default function JoinLobby({ onJoin }: JoinLobbyProps) {
         .single();
 
       if (playerError) throw playerError;
-
-      // Update lobby status to playing when second player joins
-      await supabase
-        .from('lobbies')
-        .update({ game_status: 'playing' })
-        .eq('code', lobbyCode.toUpperCase());
 
       onJoin(lobbyCode.toUpperCase(), playerData.id, nickname);
       toast.success('Successfully joined the lobby!');

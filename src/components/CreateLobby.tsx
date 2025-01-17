@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
+import { Users } from 'lucide-react';
 
 function generateLobbyCode() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -13,12 +14,12 @@ interface CreateLobbyProps {
 
 export default function CreateLobby({ onJoin }: CreateLobbyProps) {
   const [nickname, setNickname] = useState('');
+  const [maxPlayers, setMaxPlayers] = useState(2);
   const [loading, setLoading] = useState(false);
   const [createdLobbyCode, setCreatedLobbyCode] = useState<string | null>(null);
 
   useEffect(() => {
     if (createdLobbyCode) {
-      // Subscribe to changes in the players table for this lobby
       const playersSubscription = supabase
         .channel('created-lobby-players')
         .on(
@@ -35,7 +36,6 @@ export default function CreateLobby({ onJoin }: CreateLobbyProps) {
         )
         .subscribe();
 
-      // Subscribe to changes in the lobby status
       const lobbySubscription = supabase
         .channel('created-lobby-status')
         .on(
@@ -73,7 +73,7 @@ export default function CreateLobby({ onJoin }: CreateLobbyProps) {
       // Create lobby
       const { error: lobbyError } = await supabase
         .from('lobbies')
-        .insert([{ code: lobbyCode }]);
+        .insert([{ code: lobbyCode, max_players: maxPlayers }]);
 
       if (lobbyError) throw lobbyError;
 
@@ -88,7 +88,7 @@ export default function CreateLobby({ onJoin }: CreateLobbyProps) {
 
       setCreatedLobbyCode(lobbyCode);
       onJoin(lobbyCode, playerData.id, nickname);
-      toast.success('Lobby created! Share the code with your friend.');
+      toast.success('Lobby created! Share the code with your friends.');
     } catch (error) {
       console.error('Error creating lobby:', error);
       toast.error('Failed to create lobby');
@@ -113,6 +113,26 @@ export default function CreateLobby({ onJoin }: CreateLobbyProps) {
           maxLength={20}
           required
         />
+      </div>
+      <div>
+        <label htmlFor="max-players" className="block text-sm font-medium text-gray-700">
+          Number of Players
+        </label>
+        <div className="mt-1 relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Users className="h-5 w-5 text-gray-400" />
+          </div>
+          <select
+            id="max-players"
+            value={maxPlayers}
+            onChange={(e) => setMaxPlayers(Number(e.target.value))}
+            className="block w-full pl-10 pr-3 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+          >
+            <option value={2}>2 Players</option>
+            <option value={3}>3 Players</option>
+            <option value={4}>4 Players</option>
+          </select>
+        </div>
       </div>
       <button
         type="submit"
