@@ -140,6 +140,7 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
           if (payload.new.winner) {
             setWinner(payload.new.winner);
           }
+          setWinner(payload.new.winner);
         }
       )
       .subscribe();
@@ -454,7 +455,7 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
                 <div className="space-y-1">
                   {players.map(player => (
                     <p key={player.id} className="text-gray-600">
-                      {player.nickname} {player.ready ? '✓' : ''}
+                      {player.nickname} {player.ready ? '✅' : ''}
                     </p>
                   ))}
                 </div>
