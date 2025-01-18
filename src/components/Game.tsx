@@ -336,10 +336,10 @@ export default function Game({
         .map((w) => w.word);
 
       const shareMessage = `
-Word Synced: ${formatPlayerNames(names)} guessed the same word (${finalWord}) within ${currentRound} rounds!
-They started with ${formatPlayerNames(roundOneWords)}.
+Word Synced: ${formatPlayerNames(names)} guessed the same word "${finalWord}" in ${currentRound} rounds! 🎉
+They started with the words ${formatPlayerNames(roundOneWords)}.
 
-Try to beat them: https://wordsynced.netlify.com
+Try to beat them ➡️ https://wordsynced.com
       `.trim();
 
       await navigator.clipboard.writeText(shareMessage);
@@ -501,7 +501,7 @@ Try to beat them: https://wordsynced.netlify.com
   // RETURN MAIN JSX
   // ---------------------------------------------------------
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-800 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-md">
         {/* Top Bar: Leave + Lobby Code */}
         <div className="flex items-center justify-between mb-6">
@@ -514,7 +514,7 @@ Try to beat them: https://wordsynced.netlify.com
           </button>
           <div className="text-right">
             <p className="text-sm font-medium text-gray-900">Lobby Code:</p>
-            <p className="text-lg font-bold text-indigo-600">{lobbyCode}</p>
+            <p className="text-3xl font-bold text-blue-600">{lobbyCode}</p>
           </div>
         </div>
 
@@ -527,7 +527,7 @@ Try to beat them: https://wordsynced.netlify.com
             <p className="text-gray-600 mb-6">A player has left the game.</p>
             <button
               onClick={handleCreateNewLobby}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
             >
               Create New Lobby
             </button>
@@ -546,6 +546,11 @@ Try to beat them: https://wordsynced.netlify.com
             <p className="text-sm text-gray-500 mt-2">
               {players.length} of {maxPlayers} players joined
             </p>
+            <img
+              src="/src/icons/wordsyncedqr.png"
+              alt="WordSynced QR"
+              className="mx-auto mt-4 w-64 h-64"
+            />
           </div>
         )}
 
@@ -562,9 +567,9 @@ Try to beat them: https://wordsynced.netlify.com
                   >
                     <span className="text-gray-900">{player.nickname}</span>
                     {player.ready_to_start ? (
-                      <span className="text-green-600 text-sm">Ready</span>
+                      <span className="text-green-600 font-bold text-md">Ready</span>
                     ) : (
-                      <span className="text-gray-400 text-sm">Not Ready</span>
+                      <span className="text-red-400 font-bold text-md">Not Ready</span>
                     )}
                   </div>
                 ))}
@@ -573,7 +578,7 @@ Try to beat them: https://wordsynced.netlify.com
             {!isReadyToStart ? (
               <button
                 onClick={handleReadyToStart}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
               >
                 Ready to Start
               </button>
@@ -591,7 +596,7 @@ Try to beat them: https://wordsynced.netlify.com
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-sm font-medium text-gray-900">Round</p>
-                <p className="text-2xl font-bold text-indigo-600">
+                <p className="text-2xl font-bold text-blue-600">
                   {currentRound}
                 </p>
               </div>
@@ -600,7 +605,7 @@ Try to beat them: https://wordsynced.netlify.com
                 <div className="space-y-1">
                   {players.map((p) => (
                     <p key={p.id} className="text-gray-600">
-                      {p.nickname} {p.ready ? '✓' : ''}
+                      {p.nickname} {p.ready ? '✅' : '💬'}
                     </p>
                   ))}
                 </div>
@@ -632,14 +637,14 @@ Try to beat them: https://wordsynced.netlify.com
                   value={currentWord}
                   onChange={(e) => setCurrentWord(e.target.value)}
                   disabled={isReady}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-gray-100"
                   placeholder="Type a word..."
                 />
               </div>
               <button
                 onClick={submitWord}
                 disabled={isReady}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
               >
                 {isReady ? 'Waiting for other players...' : 'Submit Word'}
               </button>
@@ -671,7 +676,7 @@ Try to beat them: https://wordsynced.netlify.com
               {!currentPlayer?.wants_to_play_again && (
                 <button
                   onClick={handlePlayAgain}
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
                 >
                   Play Again
                 </button>
@@ -686,7 +691,7 @@ Try to beat them: https://wordsynced.netlify.com
                 onClick={handleShareScore}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
               >
-                Share your score with your friends
+                Share your score with your friends!
               </button>
             </div>
           </div>
