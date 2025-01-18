@@ -336,7 +336,7 @@ export default function Game({
         .map((w) => w.word);
 
       const shareMessage = `
-  Word Synced: ${formatPlayerNames(names)} guessed the same word "${finalWord}" in ${currentRound} rounds! 🎉
+  ${formatPlayerNames(names)} guessed the same word "${finalWord}" in ${currentRound} rounds! 🎉
   
   They started with the words ${formatPlayerNames(roundOneWords)}.
   
@@ -516,6 +516,10 @@ export default function Game({
   return (
     <div className="min-h-screen bg-gray-800 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-md">
+        <div className="flex items-center justify-center mb-4">
+          <img src='/icons/WordSyncedLogo.svg' alt="Word Synced Logo" className="w-20 h-20 mr-2" />
+          <h1 className="text-3xl font-bold text-gray-800">Word Synced</h1>
+        </div>
         {/* Top Bar: Leave + Lobby Code */}
         <div className="flex items-center justify-between mb-6">
           <button
@@ -560,7 +564,7 @@ export default function Game({
               {players.length} of {maxPlayers} players joined
             </p>
             <img
-              src='/icons/WordSyncedLogo.svg'
+              src='/icons/wordsyncedqr.png'
               alt="WordSynced QR"
               className="mx-auto mt-4 w-64 h-64"
             />
