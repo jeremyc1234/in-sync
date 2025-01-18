@@ -328,37 +328,29 @@ export default function Game({
   // ---------------------------------------------------------
   async function handleShareScore() {
     try {
+      // 1) Build your share message
       const finalRoundWords = allWords.filter((w) => w.round === currentRound);
       const finalWord = finalRoundWords[0]?.word ?? '(unknown)';
-
       const names = players.map((p) => p.nickname);
       const roundOneWords = allWords.filter((w) => w.round === 1).map((w) => w.word);
 
       const shareMessage = `
-  ${formatPlayerNames(names)} guessed the same word "${finalWord}" in ${currentRound} rounds! 🎉
+  Word Synced: ${formatPlayerNames(names)} guessed the same word "${finalWord}" in ${currentRound} rounds! 🎉
   
   They started with the words ${formatPlayerNames(roundOneWords)}.
   
   Try to beat them ➡️ https://wordsynced.com
       `.trim();
 
-      if (navigator.share) {
-        // Modern browsers / iOS Safari: open native share sheet
-        await navigator.share({
-          title: 'WordSynced Score',
-          text: shareMessage,
-          url: 'https://wordsynced.com',
-        });
-      } else {
-        // Fallback: copy to clipboard
-        await navigator.clipboard.writeText(shareMessage);
-      }
+      // 2) Encode the message to safely include spaces, punctuation, etc.
+      const encodedMessage = encodeURIComponent(shareMessage);
 
-      // Once sharing or copying is done, update button text
-      setShareButtonText('Copied to clipboard!');
+      // 3) Open the default SMS app. 
+      //    This typically works on iOS/Android and will open iMessage on iOS.
+      window.location.href = `sms:?body=${encodedMessage}`;
     } catch (error) {
-      console.error('Failed to share:', error);
-      toast.error('Failed to share score');
+      console.error('Failed to share via SMS:', error);
+      toast.error('Failed to open SMS');
     }
   }
   // ---------------------------------------------------------
