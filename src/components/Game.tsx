@@ -3,11 +3,19 @@ import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import { ArrowLeft } from 'lucide-react';
 
+/** Helper to generate a random 5-character lobby code. */
+function generateLobbyCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  return Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
 interface GameProps {
   lobbyCode: string;
   playerId: string;
   nickname: string;
   onExit: () => void;
+  /** Add this so we can automatically jump to the new lobby once created. */
+  onJoin?: (newLobbyCode: string, newPlayerId: string, nickname: string) => void;
 }
 
 interface Player {
@@ -16,7 +24,7 @@ interface Player {
   current_word: string | null;
   ready: boolean;
   ready_to_start: boolean;
-  wants_to_play_again: boolean;
+  wants_to_play_again: boolean; // <-- NEW: Track who wants to play again
 }
 
 interface Word {
@@ -25,7 +33,13 @@ interface Word {
   round: number;
 }
 
-export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProps) {
+export default function Game({
+  lobbyCode,
+  playerId,
+  nickname,
+  onExit,
+  onJoin, // <-- optional, if you want automatic rejoin
+}: GameProps) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [currentWord, setCurrentWord] = useState('');
   const [gameStatus, setGameStatus] = useState<'waiting' | 'ready' | 'playing' | 'finished'>('waiting');
@@ -36,25 +50,31 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
   const [playerLeft, setPlayerLeft] = useState(false);
   const [maxPlayers, setMaxPlayers] = useState(2);
 
-  // Initial data fetch
+  // ---------------------------------------------------------
+  // 1) INITIAL DATA FETCH
+  // ---------------------------------------------------------
   useEffect(() => {
     const fetchInitialData = async () => {
       const [playersData, lobbyData, wordsData] = await Promise.all([
         supabase.from('players').select('*').eq('lobby_code', lobbyCode),
         supabase.from('lobbies').select('*').eq('code', lobbyCode).single(),
-        supabase.from('words').select('*').eq('lobby_code', lobbyCode).order('round', { ascending: true })
+        supabase.from('words').select('*').eq('lobby_code', lobbyCode).order('round', { ascending: true }),
       ]);
 
       if (playersData.data) setPlayers(playersData.data);
+
       if (lobbyData.data) {
         setGameStatus(lobbyData.data.game_status);
         setCurrentRound(lobbyData.data.current_round);
         setWinner(lobbyData.data.winner);
         setMaxPlayers(lobbyData.data.max_players);
       }
+
       if (wordsData.data) {
         setAllWords(wordsData.data);
-        const currentRoundWords = wordsData.data.filter(w => w.round === currentRound);
+        const currentRoundWords = wordsData.data.filter(
+          (w) => w.round === (lobbyData.data?.current_round || 1)
+        );
         setRoundWords(currentRoundWords);
       }
     };
@@ -62,8 +82,11 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
     fetchInitialData();
   }, [lobbyCode]);
 
-  // Real-time subscriptions
+  // ---------------------------------------------------------
+  // 2) REAL-TIME SUBSCRIPTIONS
+  // ---------------------------------------------------------
   useEffect(() => {
+    // Players subscription
     const playersSubscription = supabase
       .channel('game-players')
       .on(
@@ -72,57 +95,55 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
           event: '*',
           schema: 'public',
           table: 'players',
-          filter: `lobby_code=eq.${lobbyCode}`
+          filter: `lobby_code=eq.${lobbyCode}`,
         },
         async (payload) => {
-          // Get the latest list of players
+          // Re-fetch the latest players
           const { data: updatedPlayers } = await supabase
             .from('players')
             .select('*')
             .eq('lobby_code', lobbyCode);
 
           if (updatedPlayers) {
-            setPlayers(updatedPlayers);
-
-            // Check if a player left
+            // Detect if someone left (length decreased)
             if (updatedPlayers.length < players.length) {
               setPlayerLeft(true);
               toast.error('A player has left the game');
             }
+            setPlayers(updatedPlayers);
 
-            // 1) Fetch the current lobby status first
+            // Check if the game is finished and no new lobby is created yet
             const { data: lobbyRes } = await supabase
               .from('lobbies')
-              .select('game_status')
+              .select('game_status, new_lobby_code')
               .eq('code', lobbyCode)
               .single();
-
-            // 2) If the lobby is NOT finished, check if all players are ready to start
             if (
-              lobbyRes?.game_status !== 'finished' &&
+              lobbyRes?.game_status === 'waiting' &&
               updatedPlayers.length >= 2 &&
-              updatedPlayers.length <= maxPlayers &&
               updatedPlayers.every((p) => p.ready_to_start)
             ) {
               await supabase
                 .from('lobbies')
                 .update({ game_status: 'playing' })
                 .eq('code', lobbyCode);
+              console.log('All players are ready. Game set to "playing"!');
             }
-
-            // 3) If the lobby is truly in "finished" AND everyone wants to play again,
-            //    then call handleStartNewGame().
             if (
               lobbyRes?.game_status === 'finished' &&
+              !lobbyRes.new_lobby_code && // new lobby not created yet
+              updatedPlayers.length > 0 &&
               updatedPlayers.every((p) => p.wants_to_play_again)
             ) {
-              handleCreateNewLobbyForReplay();
+              toast.success('All players want to play again! Creating new lobby...');
+              await createNewLobbyForEveryone();
             }
           }
         }
       )
       .subscribe();
 
+    // Lobby subscription
     const lobbySubscription = supabase
       .channel('game-lobby')
       .on(
@@ -131,7 +152,7 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
           event: '*',
           schema: 'public',
           table: 'lobbies',
-          filter: `code=eq.${lobbyCode}`
+          filter: `code=eq.${lobbyCode}`,
         },
         async (payload) => {
           console.log('Lobby updated:', payload);
@@ -140,17 +161,33 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
           if (payload.new.winner) {
             setWinner(payload.new.winner);
           }
-          setWinner(payload.new.winner);
-          // If the lobby has just moved from 'finished' to 'playing', 
-          // force-clear the word history for everyone:
-          if (payload.new.game_status === 'playing') {
-            setAllWords([]);
-            setRoundWords([]);
+
+          // If new_lobby_code is set => the new lobby was just created
+          if (payload.new.new_lobby_code && onJoin) {
+            const newCode = payload.new.new_lobby_code as string;
+
+            // Wait briefly for the new players to be inserted
+            setTimeout(async () => {
+              // Find our new player record by matching nickname
+              const { data: found } = await supabase
+                .from('players')
+                .select('id')
+                .eq('lobby_code', newCode)
+                .eq('nickname', nickname)
+                .single();
+
+              if (found?.id) {
+                onJoin(newCode, found.id, nickname);
+              } else {
+                toast.error('Could not find your player record in the new lobby!');
+              }
+            }, 300);
           }
         }
       )
       .subscribe();
 
+    // Words subscription
     const wordsSubscription = supabase
       .channel('game-words')
       .on(
@@ -159,7 +196,7 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
           event: '*',
           schema: 'public',
           table: 'words',
-          filter: `lobby_code=eq.${lobbyCode}`
+          filter: `lobby_code=eq.${lobbyCode}`,
         },
         async () => {
           const { data } = await supabase
@@ -167,21 +204,23 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
             .select('*')
             .eq('lobby_code', lobbyCode)
             .order('round', { ascending: true });
+
           if (data) {
             console.log('Words updated:', data);
             setAllWords(data);
-            const currentRoundWords = data.filter(w => w.round === currentRound);
+            const currentRoundWords = data.filter((w) => w.round === currentRound);
             setRoundWords(currentRoundWords);
 
-            // Check if all players submitted their words
+            // Check if all players submitted in this round
             if (currentRoundWords.length === players.length) {
-              // Check if all words match
-              const allWordsMatch = currentRoundWords.every(w =>
-                w.word.toLowerCase() === currentRoundWords[0].word.toLowerCase()
+              // check if all words match
+              const allWordsMatch = currentRoundWords.every(
+                (w) =>
+                  w.word.toLowerCase() === currentRoundWords[0].word.toLowerCase()
               );
 
               if (allWordsMatch) {
-                // Game won!
+                // Mark game finished
                 await supabase
                   .from('lobbies')
                   .update({
@@ -191,7 +230,7 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
                   })
                   .eq('code', lobbyCode);
               } else {
-                // Next round
+                // Proceed to next round
                 await supabase
                   .from('lobbies')
                   .update({
@@ -199,7 +238,7 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
                   })
                   .eq('code', lobbyCode);
 
-                // Reset player ready status
+                // Reset player ready states
                 await supabase
                   .from('players')
                   .update({ ready: false, current_word: null })
@@ -216,55 +255,93 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
       lobbySubscription.unsubscribe();
       wordsSubscription.unsubscribe();
     };
-  }, [lobbyCode, currentRound, players.length, maxPlayers, nickname]);
-  /**
-   * Helper to format player names:
-   *  - 2 players: "Alice and Bob"
-   *  - 3 players: "Alice, Bob and Charlie"
-   *  - 4 players: "Alice, Bob, Charlie and Dave"
-   */
+  }, [lobbyCode, currentRound, players.length, nickname, onJoin]);
+
+  // ---------------------------------------------------------
+  // CREATE NEW LOBBY FOR EVERYONE (called once all have pressed play again)
+  // ---------------------------------------------------------
+  async function createNewLobbyForEveryone() {
+    try {
+      // 1) Fetch old lobby for max_players
+      const { data: oldLobby } = await supabase
+        .from('lobbies')
+        .select('max_players')
+        .eq('code', lobbyCode)
+        .single();
+
+      if (!oldLobby) {
+        toast.error('Old lobby not found.');
+        return;
+      }
+
+      // 2) Generate a brand-new code
+      const newLobbyCode = generateLobbyCode();
+
+      // 3) Create the new lobby
+      const { error: lobbyError } = await supabase
+        .from('lobbies')
+        .insert([
+          { code: newLobbyCode, max_players: oldLobby.max_players },
+        ]);
+      if (lobbyError) throw lobbyError;
+
+      // 4) Insert all existing players (same nicknames) into the new lobby
+      const newPlayers = players.map((p) => ({
+        lobby_code: newLobbyCode,
+        nickname: p.nickname,
+      }));
+
+      const { error: insertError } = await supabase
+        .from('players')
+        .insert(newPlayers);
+      if (insertError) throw insertError;
+
+      // 5) Update the old lobby’s new_lobby_code so all clients see it
+      const { error: updateError } = await supabase
+        .from('lobbies')
+        .update({ new_lobby_code: newLobbyCode })
+        .eq('code', lobbyCode);
+
+      if (updateError) throw updateError;
+
+      console.log('Created new lobby for everyone:', newLobbyCode);
+    } catch (error) {
+      console.error('Error creating new lobby for everyone:', error);
+      toast.error('Failed to create new lobby');
+    }
+  }
+
+  // ---------------------------------------------------------
+  // UTILITY: format a list of names with commas and "and"
+  // ---------------------------------------------------------
   function formatPlayerNames(names: string[]) {
     if (names.length === 0) return '';
     if (names.length === 1) return names[0];
     if (names.length === 2) return names.join(' and ');
-    return (
-      names.slice(0, -1).join(', ') +
-      ' and ' +
-      names[names.length - 1]
-    );
+    return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
   }
 
-  /**
- * Handle copying the final game result to the clipboard.
- */
+  // ---------------------------------------------------------
+  // SHARE SCORE
+  // ---------------------------------------------------------
   async function handleShareScore() {
     try {
-      // The final round is `currentRound`.
-      // Since the game ended on this round, the matching word(s)
-      // are in `allWords` with round === currentRound.
+      // final round is currentRound
       const finalRoundWords = allWords.filter((w) => w.round === currentRound);
-
-      // All final-round words should match; take the first:
       const finalWord = finalRoundWords[0]?.word ?? '(unknown)';
 
-      // Gather all player nicknames
       const names = players.map((p) => p.nickname);
-      const formattedNames = formatPlayerNames(names);
+      const roundOneWords = allWords
+        .filter((w) => w.round === 1)
+        .map((w) => w.word);
 
-      // Gather Round 1 words (just the words, no player names)
-      const roundOneWords = allWords.filter((w) => w.round === 1);
-      const roundOneWordsOnly = roundOneWords.map((w) => w.word);
+      const shareMessage = `
+Word Synced: ${formatPlayerNames(names)} guessed the same word (${finalWord}) within ${currentRound} rounds!
+They started with ${formatPlayerNames(roundOneWords)}.
 
-      // Format them so that the last word is preceded by "and"
-      const roundOneWordsFormatted = formatPlayerNames(roundOneWordsOnly);
+Try to beat them: https://wordsynced.netlify.com
+      `.trim();
 
-      // Construct the share message:
-      const shareMessage =
-        `Word Synced: ${formattedNames} guessed the same word (${finalWord}) within ${currentRound} rounds! ` +
-        `They started with ${roundOneWordsFormatted}.\n\n` +
-        `Try to beat them: https://wordsynced.netlify.com`;
-
-      // Copy to clipboard
       await navigator.clipboard.writeText(shareMessage);
       toast.success('Score copied to clipboard!');
     } catch (error) {
@@ -273,6 +350,9 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
     }
   }
 
+  // ---------------------------------------------------------
+  // READY TO START
+  // ---------------------------------------------------------
   const handleReadyToStart = async () => {
     try {
       await supabase
@@ -285,6 +365,9 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
     }
   };
 
+  // ---------------------------------------------------------
+  // SUBMIT WORD
+  // ---------------------------------------------------------
   const submitWord = async () => {
     if (!currentWord.trim()) {
       toast.error('Please enter a word');
@@ -293,18 +376,16 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
 
     const normalizedWord = currentWord.toLowerCase().trim();
 
-    // Check if the word has been used in previous rounds
-    const wordUsedInPreviousRounds = allWords.some(w =>
-      w.round < currentRound && w.word.toLowerCase() === normalizedWord
+    // Check if used in previous rounds
+    const wordUsedInPreviousRounds = allWords.some(
+      (w) => w.round < currentRound && w.word.toLowerCase() === normalizedWord
     );
-
     if (wordUsedInPreviousRounds) {
       toast.error('This word has been used in a previous round. Try a different word!');
       return;
     }
 
     try {
-      // Submit word
       await supabase.from('words').insert([
         {
           lobby_code: lobbyCode,
@@ -314,7 +395,7 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
         },
       ]);
 
-      // Update player ready status
+      // Update player's submitted word/ready
       await supabase
         .from('players')
         .update({ current_word: currentWord, ready: true })
@@ -327,6 +408,9 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
     }
   };
 
+  // ---------------------------------------------------------
+  // EXIT LOBBY
+  // ---------------------------------------------------------
   const handleExit = async () => {
     try {
       await supabase.from('players').delete().eq('id', playerId);
@@ -337,6 +421,9 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
     }
   };
 
+  // ---------------------------------------------------------
+  // REQUEST PLAY AGAIN (just sets wants_to_play_again = true)
+  // ---------------------------------------------------------
   const handlePlayAgain = async () => {
     try {
       await supabase
@@ -344,48 +431,19 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
         .update({ wants_to_play_again: true })
         .eq('id', playerId);
 
-      toast.success('Waiting for other players to play again...');
+      toast('Waiting for everyone else to press Play Again...');
     } catch (error) {
       console.error('Error requesting play again:', error);
       toast.error('Failed to request play again');
     }
   };
 
-  const handleStartNewGame = async () => {
-    try {
-      await supabase
-        .from('lobbies')
-        .update({
-          game_status: 'waiting',
-          current_round: 1,
-          winner: null,
-          rounds_taken: null,
-        })
-        .eq('code', lobbyCode);
-
-      await supabase
-        .from('players')
-        .update({
-          ready: false,
-          current_word: null,
-          wants_to_play_again: false,
-          ready_to_start: false
-        })
-        .eq('lobby_code', lobbyCode);
-
-      await supabase.from('words').delete().eq('lobby_code', lobbyCode);
-
-      setCurrentWord('');
-      setWinner(null);
-      setAllWords([]);
-    } catch (error) {
-      console.error('Error restarting game:', error);
-      toast.error('Failed to restart game');
-    }
-  };
-
+  // ---------------------------------------------------------
+  // CREATE A BRAND-NEW LOBBY (MANUAL BUTTON IF PLAYER LEFT)
+  // ---------------------------------------------------------
   const handleCreateNewLobby = async () => {
     try {
+      // We’ll reuse your existing "handleExit" logic to go back to menu
       await handleExit();
       onExit();
     } catch (error) {
@@ -394,29 +452,36 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
     }
   };
 
+  // ---------------------------------------------------------
+  // GET CURRENT PLAYER / DERIVED STATES
+  // ---------------------------------------------------------
   const currentPlayer = players.find((p) => p.id === playerId);
   const isReady = currentPlayer?.ready;
   const isReadyToStart = currentPlayer?.ready_to_start;
   const allPlayersPresent = players.length >= 2 && players.length <= maxPlayers;
-  const allPlayersReady = players.every(p => p.ready_to_start);
   const allPlayersSubmitted = roundWords.length === players.length;
 
+  // ---------------------------------------------------------
+  // RENDER WORD HISTORY
+  // ---------------------------------------------------------
   const renderWordHistory = () => {
-    const groupedWords = allWords.reduce((acc, word) => {
-      if (!acc[word.round]) {
-        acc[word.round] = [];
-      }
+    const groupedWords = allWords.reduce<Record<number, Word[]>>((acc, word) => {
+      if (!acc[word.round]) acc[word.round] = [];
       acc[word.round].push(word);
       return acc;
-    }, {} as Record<number, Word[]>);
+    }, {});
 
-    // Sort the rounds in descending order
+    // Sort by round descending
     return Object.entries(groupedWords)
-      .sort((a, b) => Number(b[0]) - Number(a[0])) // Sort by round in descending order
-      .filter(([round]) => Number(round) < currentRound || allPlayersSubmitted)
+      .sort((a, b) => Number(b[0]) - Number(a[0]))
+      .filter(
+        ([round]) => Number(round) < currentRound || allPlayersSubmitted
+      )
       .map(([round, words]) => (
         <div key={round} className="mb-4 p-4 bg-gray-50 rounded-lg">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Round {round}</h4>
+          <h4 className="text-sm font-medium text-gray-700 mb-2">
+            Round {round}
+          </h4>
           <div className="space-y-2">
             {words.map((word, index) => {
               const player = players.find((p) => p.id === word.player_id);
@@ -432,9 +497,13 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
       ));
   };
 
+  // ---------------------------------------------------------
+  // RETURN MAIN JSX
+  // ---------------------------------------------------------
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-md">
+        {/* Top Bar: Leave + Lobby Code */}
         <div className="flex items-center justify-between mb-6">
           <button
             onClick={handleExit}
@@ -449,36 +518,48 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
           </div>
         </div>
 
+        {/* If a player left, show a "Game Ended" screen */}
         {playerLeft && (
           <div className="text-center py-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Game Ended</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              Game Ended
+            </h2>
             <p className="text-gray-600 mb-6">A player has left the game.</p>
             <button
               onClick={handleCreateNewLobby}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
             >
               Create New Lobby
             </button>
           </div>
         )}
 
+        {/* If not enough players joined yet */}
         {!playerLeft && !allPlayersPresent && (
           <div className="text-center py-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Waiting for players...</h2>
-            <p className="text-gray-600">Share the lobby code with your friends to start playing!</p>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Waiting for players...
+            </h2>
+            <p className="text-gray-600">
+              Share the lobby code with your friends to start playing!
+            </p>
             <p className="text-sm text-gray-500 mt-2">
               {players.length} of {maxPlayers} players joined
             </p>
           </div>
         )}
 
+        {/* Waiting for "Ready to Start" */}
         {!playerLeft && allPlayersPresent && gameStatus === 'waiting' && (
           <div className="space-y-6">
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Players</h3>
               <div className="space-y-2">
                 {players.map((player) => (
-                  <div key={player.id} className="flex items-center justify-between">
+                  <div
+                    key={player.id}
+                    className="flex items-center justify-between"
+                  >
                     <span className="text-gray-900">{player.nickname}</span>
                     {player.ready_to_start ? (
                       <span className="text-green-600 text-sm">Ready</span>
@@ -492,7 +573,7 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
             {!isReadyToStart ? (
               <button
                 onClick={handleReadyToStart}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
               >
                 Ready to Start
               </button>
@@ -504,19 +585,22 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
           </div>
         )}
 
+        {/* Main "Playing" Screen */}
         {!playerLeft && allPlayersPresent && gameStatus === 'playing' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-sm font-medium text-gray-900">Round</p>
-                <p className="text-2xl font-bold text-indigo-600">{currentRound}</p>
+                <p className="text-2xl font-bold text-indigo-600">
+                  {currentRound}
+                </p>
               </div>
               <div className="text-right">
                 <p className="text-sm font-medium text-gray-900">Players</p>
                 <div className="space-y-1">
-                  {players.map(player => (
-                    <p key={player.id} className="text-gray-600">
-                      {player.nickname} {player.ready ? '✅' : ''}
+                  {players.map((p) => (
+                    <p key={p.id} className="text-gray-600">
+                      {p.nickname} {p.ready ? '✓' : ''}
                     </p>
                   ))}
                 </div>
@@ -525,7 +609,9 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
 
             {allWords.length > 0 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900">Word History</h3>
+                <h3 className="text-lg font-medium text-gray-900">
+                  Word History
+                </h3>
                 <div className="max-h-60 overflow-y-auto space-y-4">
                   {renderWordHistory()}
                 </div>
@@ -534,7 +620,10 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
 
             <div className="space-y-4">
               <div>
-                <label htmlFor="word" className="block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="word"
+                  className="block text-sm font-medium text-gray-700"
+                >
                   Enter your word
                 </label>
                 <input
@@ -550,7 +639,7 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
               <button
                 onClick={submitWord}
                 disabled={isReady}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
               >
                 {isReady ? 'Waiting for other players...' : 'Submit Word'}
               </button>
@@ -558,39 +647,44 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
           </div>
         )}
 
+        {/* Finished Screen */}
         {!playerLeft && gameStatus === 'finished' && (
           <div className="text-center space-y-6">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Game Over!</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                Game Over!
+              </h2>
               <p className="text-lg text-gray-600">
                 It took {currentRound} rounds to match words!
               </p>
             </div>
             <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900">Final Word History</h3>
+              <h3 className="text-lg font-medium text-gray-900">
+                Word History
+              </h3>
               <div className="max-h-60 overflow-y-auto space-y-4">
                 {renderWordHistory()}
               </div>
             </div>
             <div className="space-y-2">
-              <button
-                onClick={handlePlayAgain}
-                disabled={currentPlayer?.wants_to_play_again}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-              >
-                {currentPlayer?.wants_to_play_again
-                  ? 'Waiting for other players...'
-                  : 'Play Again'}
-              </button>
-              {players.some(p => p.wants_to_play_again) && (
+              {/* "Play Again" now sets wants_to_play_again = true */}
+              {!currentPlayer?.wants_to_play_again && (
+                <button
+                  onClick={handlePlayAgain}
+                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                >
+                  Play Again
+                </button>
+              )}
+              {currentPlayer?.wants_to_play_again && (
                 <p className="text-sm text-gray-600">
-                  {players.filter(p => p.wants_to_play_again).map(p => p.nickname).join(', ')}
-                  {players.filter(p => p.wants_to_play_again).length === 1 ? ' wants' : ' want'} to play again
+                  Waiting for everyone else to press Play Again...
                 </p>
               )}
+
               <button
                 onClick={handleShareScore}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
               >
                 Share your score with your friends
               </button>

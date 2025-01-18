@@ -17,14 +17,16 @@ function App() {
   };
 
   if (gameState.lobbyCode && gameState.playerId) {
-    return <Game
-      lobbyCode={gameState.lobbyCode}
-      playerId={gameState.playerId}
-      nickname={gameState.nickname!}
-      onExit={() => setGameState({})}
-    />;
+    return (
+      <Game
+        lobbyCode={gameState.lobbyCode}
+        playerId={gameState.playerId}
+        nickname={gameState.nickname!}
+        onExit={() => setGameState({})}
+        onJoin={handleJoinGame} // <-- pass the same join logic down
+      />
+    );
   }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center p-4">
       <Toaster position="top-center" />
