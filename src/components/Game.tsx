@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import { ArrowLeft } from 'lucide-react';
-import qrCode from '/icons/wordsyncedqr.png'
 
 /** Helper to generate a random 5-character lobby code. */
 function generateLobbyCode() {
@@ -327,7 +326,7 @@ export default function Game({
   // ---------------------------------------------------------
   async function handleShareScore() {
     try {
-      // final round is currentRound
+      // Final round / share text logic (same as before):
       const finalRoundWords = allWords.filter((w) => w.round === currentRound);
       const finalWord = finalRoundWords[0]?.word ?? '(unknown)';
 
@@ -337,20 +336,33 @@ export default function Game({
         .map((w) => w.word);
 
       const shareMessage = `
-Word Synced: ${formatPlayerNames(names)} guessed the same word "${finalWord}" in ${currentRound} rounds! 🎉
-They started with the words ${formatPlayerNames(roundOneWords)}.
-
-Try to beat them ➡️ https://wordsynced.com
+  Word Synced: ${formatPlayerNames(names)} guessed the same word "${finalWord}" in ${currentRound} rounds! 🎉
+  
+  They started with the words ${formatPlayerNames(roundOneWords)}.
+  
+  Try to beat them ➡️ https://wordsynced.com
       `.trim();
 
-      await navigator.clipboard.writeText(shareMessage);
-      toast.success('Score copied to clipboard!');
+      // 1) Check if the Web Share API is available
+      if (navigator.share) {
+        await navigator.share({
+          title: 'WordSynced Score',
+          text: shareMessage,
+          url: 'https://wordsynced.com',
+        });
+        // The user will see the native iOS/Android share sheet here
+        // and choose iMessage or another app. They will automatically
+        // return to your page afterwards.
+      } else {
+        // 2) If no Web Share API, fall back to copy-to-clipboard
+        await navigator.clipboard.writeText(shareMessage);
+        toast.success('Score copied to clipboard!');
+      }
     } catch (error) {
-      console.error('Failed to copy score:', error);
-      toast.error('Failed to copy score');
+      console.error('Failed to share:', error);
+      toast.error('Failed to share score');
     }
   }
-
   // ---------------------------------------------------------
   // READY TO START
   // ---------------------------------------------------------
