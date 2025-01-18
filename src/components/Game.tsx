@@ -547,7 +547,7 @@ Try to beat them ➡️ https://wordsynced.com
               {players.length} of {maxPlayers} players joined
             </p>
             <img
-              src="/icons/wordsyncedqr.png"
+              src="icons/wordsyncedqr.png"
               alt="WordSynced QR"
               className="mx-auto mt-4 w-64 h-64"
             />
