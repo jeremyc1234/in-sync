@@ -116,7 +116,7 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
               lobbyRes?.game_status === 'finished' &&
               updatedPlayers.every((p) => p.wants_to_play_again)
             ) {
-              handleStartNewGame();
+              handleCreateNewLobbyForReplay();
             }
           }
         }
@@ -141,6 +141,12 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
             setWinner(payload.new.winner);
           }
           setWinner(payload.new.winner);
+          // If the lobby has just moved from 'finished' to 'playing', 
+          // force-clear the word history for everyone:
+          if (payload.new.game_status === 'playing') {
+            setAllWords([]);
+            setRoundWords([]);
+          }
         }
       )
       .subscribe();
@@ -211,6 +217,61 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
       wordsSubscription.unsubscribe();
     };
   }, [lobbyCode, currentRound, players.length, maxPlayers, nickname]);
+  /**
+   * Helper to format player names:
+   *  - 2 players: "Alice and Bob"
+   *  - 3 players: "Alice, Bob and Charlie"
+   *  - 4 players: "Alice, Bob, Charlie and Dave"
+   */
+  function formatPlayerNames(names: string[]) {
+    if (names.length === 0) return '';
+    if (names.length === 1) return names[0];
+    if (names.length === 2) return names.join(' and ');
+    return (
+      names.slice(0, -1).join(', ') +
+      ' and ' +
+      names[names.length - 1]
+    );
+  }
+
+  /**
+ * Handle copying the final game result to the clipboard.
+ */
+  async function handleShareScore() {
+    try {
+      // The final round is `currentRound`.
+      // Since the game ended on this round, the matching word(s)
+      // are in `allWords` with round === currentRound.
+      const finalRoundWords = allWords.filter((w) => w.round === currentRound);
+
+      // All final-round words should match; take the first:
+      const finalWord = finalRoundWords[0]?.word ?? '(unknown)';
+
+      // Gather all player nicknames
+      const names = players.map((p) => p.nickname);
+      const formattedNames = formatPlayerNames(names);
+
+      // Gather Round 1 words (just the words, no player names)
+      const roundOneWords = allWords.filter((w) => w.round === 1);
+      const roundOneWordsOnly = roundOneWords.map((w) => w.word);
+
+      // Format them so that the last word is preceded by "and"
+      const roundOneWordsFormatted = formatPlayerNames(roundOneWordsOnly);
+
+      // Construct the share message:
+      const shareMessage =
+        `Word Synced: ${formattedNames} guessed the same word (${finalWord}) within ${currentRound} rounds! ` +
+        `They started with ${roundOneWordsFormatted}.\n\n` +
+        `Try to beat them: https://wordsynced.netlify.com`;
+
+      // Copy to clipboard
+      await navigator.clipboard.writeText(shareMessage);
+      toast.success('Score copied to clipboard!');
+    } catch (error) {
+      console.error('Failed to copy score:', error);
+      toast.error('Failed to copy score');
+    }
+  }
 
   const handleReadyToStart = async () => {
     try {
@@ -295,7 +356,7 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
       await supabase
         .from('lobbies')
         .update({
-          game_status: 'playing',
+          game_status: 'waiting',
           current_round: 1,
           winner: null,
           rounds_taken: null,
@@ -527,6 +588,12 @@ export default function Game({ lobbyCode, playerId, nickname, onExit }: GameProp
                   {players.filter(p => p.wants_to_play_again).length === 1 ? ' wants' : ' want'} to play again
                 </p>
               )}
+              <button
+                onClick={handleShareScore}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              >
+                Share your score with your friends
+              </button>
             </div>
           </div>
         )}
