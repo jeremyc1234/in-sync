@@ -58,7 +58,7 @@ function App() {
               <strong>How to play:</strong> Start by typing any random word. Then, try to type the same word as your partner(s) in subsequent rounds by finding a connection or commonality between the previous words.
             </p>
             <p className="text-sm text-gray-700">
-              For example: If one says "beach" and the other says "wave", the next round might lead to "surfboard" or "water." The goal is to match words as quickly as possible!
+              For example: If one says "beach" and the other says "wave", the next round might lead to "surfboard" or "water". The goal is to match words as quickly as possible!
             </p>
           </div>
         )}
