@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import { ArrowLeft } from 'lucide-react';
+import qrCode from '/icons/wordsyncedqr.png'
 
 /** Helper to generate a random 5-character lobby code. */
 function generateLobbyCode() {
@@ -547,7 +548,7 @@ Try to beat them ➡️ https://wordsynced.com
               {players.length} of {maxPlayers} players joined
             </p>
             <img
-              src="icons/wordsyncedqr.png"
+              src={qrCode}
               alt="WordSynced QR"
               className="mx-auto mt-4 w-64 h-64"
             />
