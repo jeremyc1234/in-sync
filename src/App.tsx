@@ -55,7 +55,7 @@ function App() {
               <strong>Best for:</strong> Two players minimum. It&apos;s more challenging with more.
             </p>
             <p className="text-sm text-gray-700 mb-2">
-              <strong>How to play:</strong> Start by typing any random word simultaneously. Then, try to type the same word in subsequent rounds by finding a connection or commonality between the previous words.
+              <strong>How to play:</strong> Start by typing any random word. Then, try to type the same word as your partner(s) in subsequent rounds by finding a connection or commonality between the previous words.
             </p>
             <p className="text-sm text-gray-700">
               For example: If one says "beach" and the other says "wave", the next round might lead to "surfboard" or "water." The goal is to match words as quickly as possible!
