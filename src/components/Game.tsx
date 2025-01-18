@@ -49,6 +49,8 @@ export default function Game({
   const [winner, setWinner] = useState<string | null>(null);
   const [playerLeft, setPlayerLeft] = useState(false);
   const [maxPlayers, setMaxPlayers] = useState(2);
+  const [shareButtonText, setShareButtonText] = useState('Share your score with your friends!');
+
 
   // ---------------------------------------------------------
   // 1) INITIAL DATA FETCH
@@ -326,14 +328,11 @@ export default function Game({
   // ---------------------------------------------------------
   async function handleShareScore() {
     try {
-      // Final round / share text logic (same as before):
       const finalRoundWords = allWords.filter((w) => w.round === currentRound);
       const finalWord = finalRoundWords[0]?.word ?? '(unknown)';
 
       const names = players.map((p) => p.nickname);
-      const roundOneWords = allWords
-        .filter((w) => w.round === 1)
-        .map((w) => w.word);
+      const roundOneWords = allWords.filter((w) => w.round === 1).map((w) => w.word);
 
       const shareMessage = `
   ${formatPlayerNames(names)} guessed the same word "${finalWord}" in ${currentRound} rounds! 🎉
@@ -343,21 +342,20 @@ export default function Game({
   Try to beat them ➡️ https://wordsynced.com
       `.trim();
 
-      // 1) Check if the Web Share API is available
       if (navigator.share) {
+        // Modern browsers / iOS Safari: open native share sheet
         await navigator.share({
           title: 'WordSynced Score',
           text: shareMessage,
           url: 'https://wordsynced.com',
         });
-        // The user will see the native iOS/Android share sheet here
-        // and choose iMessage or another app. They will automatically
-        // return to your page afterwards.
       } else {
-        // 2) If no Web Share API, fall back to copy-to-clipboard
+        // Fallback: copy to clipboard
         await navigator.clipboard.writeText(shareMessage);
-        toast.success('Score copied to clipboard!');
       }
+
+      // Once sharing or copying is done, update button text
+      setShareButtonText('Copied to clipboard!');
     } catch (error) {
       console.error('Failed to share:', error);
       toast.error('Failed to share score');
@@ -708,7 +706,7 @@ export default function Game({
                 onClick={handleShareScore}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
               >
-                Share your score with your friends!
+                {shareButtonText}
               </button>
             </div>
           </div>
