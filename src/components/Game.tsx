@@ -339,7 +339,7 @@ export default function Game({
   
 They started with the words ${formatPlayerNames(roundOneWords)}.
   
-  Try to beat us ➡️ https://wordsynced.com
+Try to beat us ➡️ https://wordsynced.com
       `.trim();
 
       // 2) Encode the message to safely include spaces, punctuation, etc.
