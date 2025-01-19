@@ -122,7 +122,7 @@ export default function Game({
               .single();
             if (
               lobbyRes?.game_status === 'waiting' &&
-              updatedPlayers.length >= 2 &&
+              updatedPlayers.length == maxPlayers &&
               updatedPlayers.every((p) => p.ready_to_start)
             ) {
               await supabase
