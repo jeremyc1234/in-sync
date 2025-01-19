@@ -337,9 +337,9 @@ export default function Game({
       const shareMessage = `
   Word Synced: ${formatPlayerNames(names)} guessed the same word "${finalWord}" in ${currentRound} rounds! 🎉
   
-  They started with the words ${formatPlayerNames(roundOneWords)}.
+They started with the words ${formatPlayerNames(roundOneWords)}.
   
-  Try to beat them ➡️ https://wordsynced.com
+  Try to beat us ➡️ https://wordsynced.com
       `.trim();
 
       // 2) Encode the message to safely include spaces, punctuation, etc.
