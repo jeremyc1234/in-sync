@@ -745,8 +745,8 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-sm font-medium text-gray-900">Round</p>
-                <p className="text-2xl font-bold text-blue-600">
+                <p className="text-lg font-medium text-gray-900">Round</p>
+                <p className="text-3xl font-bold text-blue-600">
                   {currentRound}
                 </p>
               </div>
@@ -767,8 +767,24 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
                 <h3 className="text-lg font-medium text-gray-900">
                   Word History
                 </h3>
-                <div className="max-h-60 overflow-y-auto space-y-4">
-                  {renderWordHistory()}
+                <div className="relative">
+                  <div
+                    className="max-h-60 overflow-y-auto space-y-4 pr-2"
+                    onScroll={(e) => {
+                      const div = e.currentTarget;
+                      const atBottom = Math.abs(div.scrollHeight - div.scrollTop - div.clientHeight) <= 1;
+                      // Find the gradient element and toggle its opacity
+                      const gradient = div.nextElementSibling as HTMLElement;
+                      if (gradient) {
+                        gradient.style.opacity = atBottom ? '0' : '1';
+                      }
+                    }}
+                  >
+                    {renderWordHistory()}
+                  </div>
+                  <div
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-gray-100 to-transparent transition-opacity duration-200"
+                  />
                 </div>
               </div>
             )}
