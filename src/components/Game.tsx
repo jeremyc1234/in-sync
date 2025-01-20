@@ -314,6 +314,24 @@ export default function Game({
   }
 
   // ---------------------------------------------------------
+  // SHARE LOBBY
+  // ---------------------------------------------------------
+
+  function handleShareLobby() {
+    try {
+      const message = `Join my Word Synced lobby! Use the code ${lobbyCode}.\n\nhttps://wordsynced.com`;
+      const encodedMessage = encodeURIComponent(message);
+
+      // This opens the default SMS app (works on most mobile devices).
+      // On desktop browsers, it may do nothing or prompt to select an app.
+      window.location.href = `sms:?body=${encodedMessage}`;
+    } catch (error) {
+      console.error('Failed to share via SMS:', error);
+      toast.error('Failed to open SMS');
+    }
+  }
+
+  // ---------------------------------------------------------
   // UTILITY: format a list of names with commas and "and"
   // ---------------------------------------------------------
   function formatPlayerNames(names: string[]) {
@@ -461,7 +479,7 @@ Try to beat us ➡️ https://wordsynced.com
   const currentPlayer = players.find((p) => p.id === playerId);
   const isReady = currentPlayer?.ready;
   const isReadyToStart = currentPlayer?.ready_to_start;
-  const allPlayersPresent = players.length >= 2 && players.length <= maxPlayers;
+  const allPlayersPresent = players.length === maxPlayers;
   const allPlayersSubmitted = roundWords.length === players.length;
 
   // ---------------------------------------------------------
@@ -553,6 +571,13 @@ Try to beat us ➡️ https://wordsynced.com
             <p className="text-sm text-gray-500 mt-2">
               {players.length} of {maxPlayers} players joined
             </p>
+            {/* Share Lobby button */}
+            <button
+              onClick={handleShareLobby}
+              className="mt-4 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+            >
+              Share Lobby
+            </button>
             <img
               src='/icons/wordsyncedqr.png'
               alt="WordSynced QR"
