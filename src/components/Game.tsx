@@ -783,7 +783,7 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
                     {renderWordHistory()}
                   </div>
                   <div
-                    className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-gray-100 to-transparent transition-opacity duration-200"
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-gray-200 to-transparent transition-opacity duration-200"
                   />
                 </div>
               </div>
