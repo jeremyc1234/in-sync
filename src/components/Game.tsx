@@ -706,7 +706,7 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
                 Game Over!
               </h2>
               <p className="text-lg text-gray-600">
-                It took {currentRound} rounds to match words!
+                It took {currentRound} rounds to get synced!
               </p>
             </div>
             <div className="space-y-4">
