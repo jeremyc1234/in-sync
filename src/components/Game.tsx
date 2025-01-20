@@ -52,6 +52,7 @@ export default function Game({
   const [maxPlayers, setMaxPlayers] = useState(2);
   const [shareButtonText, setShareButtonText] = useState('Share your score with your friends!');
   const [isDuplicateWord, setIsDuplicateWord] = useState(false);
+  const [isStatsExpanded, setIsStatsExpanded] = useState(true);
 
   // ---------------------------------------------------------
   // 1) INITIAL DATA FETCH
@@ -356,7 +357,7 @@ export default function Game({
       const shareMessage = `
   Word Synced: ${formatPlayerNames(names)} guessed the same word "${finalWord}" in ${currentRound} rounds! 🎉
   
-They started with the words ${formatPlayerNames(roundOneWords)}.
+We started with the words ${formatPlayerNames(roundOneWords)}.
   
 Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=text_message
       `.trim();
@@ -507,7 +508,7 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
 
         return (
           <div key={round} className="mb-4 p-4 bg-gray-50 rounded-lg">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">
+            <h4 className="text-lg font-bold text-gray-700 mb-2">
               Round {round}
             </h4>
             <div className="space-y-2">
@@ -529,6 +530,110 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
           </div>
         );
       });
+  };
+
+  // ---------------------------------------------------------
+  // END GAME STATISTICS
+  // ---------------------------------------------------------
+  const calculateEndGameStats = () => {
+    if (players.length <= 2) return null;
+
+    // Create a map to track matches between players
+    const playerMatches: Record<string, Record<string, number>> = {};
+    // Track total mismatches per player
+    const playerMismatches: Record<string, number> = {};
+
+    // Initialize tracking objects
+    players.forEach(p1 => {
+      playerMatches[p1.id] = {};
+      playerMismatches[p1.id] = 0;
+      players.forEach(p2 => {
+        if (p1.id !== p2.id) {
+          playerMatches[p1.id][p2.id] = 0;
+        }
+      });
+    });
+
+    // Group words by round
+    const wordsByRound = Object.values(allWords.reduce<Record<number, Word[]>>((acc, word) => {
+      if (!acc[word.round]) acc[word.round] = [];
+      acc[word.round].push(word);
+      return acc;
+    }, {}));
+
+    // Analyze each round
+    wordsByRound.forEach(roundWords => {
+      // Skip if not all players submitted
+      if (roundWords.length !== players.length) return;
+
+      // For each round, group words by the actual word to find matches
+      const wordGroups = roundWords.reduce((acc, word) => {
+        const normalized = word.word.toLowerCase();
+        if (!acc[normalized]) acc[normalized] = [];
+        acc[normalized].push(word.player_id);
+        return acc;
+      }, {} as Record<string, string[]>);
+
+      // For each group of matching words, count matches between players
+      Object.values(wordGroups).forEach(playerIds => {
+        if (playerIds.length > 1) {
+          // For each pair in this group
+          playerIds.forEach((p1, i) => {
+            playerIds.slice(i + 1).forEach(p2 => {
+              playerMatches[p1][p2]++;
+              playerMatches[p2][p1]++; // Keep this symmetrical for easier lookup
+            });
+          });
+        }
+      });
+
+      // Track mismatches for players whose words didn't match with anyone else
+      const uniqueWords = Object.entries(wordGroups);
+      uniqueWords.forEach(([word, playerIds]) => {
+        if (playerIds.length === 1) {
+          // This player's word didn't match with anyone else
+          playerMismatches[playerIds[0]]++;
+        }
+      });
+    });
+
+    // Find least in sync player (most mismatches)
+    const leastInSync = Object.entries(playerMismatches)
+      .sort(([, a], [, b]) => b - a)[0];
+
+    // Find most matching pair (divide by 2 since we counted both directions)
+    let bestPair = { player1: '', player2: '', matches: 0 };
+    Object.entries(playerMatches).forEach(([p1, matches]) => {
+      Object.entries(matches).forEach(([p2, count]) => {
+        const actualCount = count / 2; // Divide by 2 since we counted both ways
+        if (actualCount > bestPair.matches) {
+          bestPair = { player1: p1, player2: p2, matches: actualCount };
+        }
+      });
+    });
+
+    // Find individual most in sync (divide total matches by 2)
+    const playerTotalMatches = Object.entries(playerMatches).map(([playerId, matches]) => ({
+      playerId,
+      totalMatches: Object.values(matches).reduce((sum, count) => sum + count, 0) / 2
+    }));
+    const mostInSync = playerTotalMatches.sort((a, b) => b.totalMatches - a.totalMatches)[0];
+
+    return {
+      leastInSync: {
+        player: players.find(p => p.id === leastInSync[0]),
+        mismatches: leastInSync[1]
+      },
+      mostInSync: {
+        player: players.find(p => p.id === mostInSync.playerId),
+        matches: mostInSync.totalMatches
+      },
+      bestPair: {
+        player1: players.find(p => p.id === bestPair.player1),
+        player2: players.find(p => p.id === bestPair.player2),
+        matches: bestPair.matches
+      }
+    };
   };
 
   // ---------------------------------------------------------
@@ -691,7 +796,11 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
                     const value = e.target.value;
                     setCurrentWord(value);
                     const normalizedWord = value.toLowerCase().trim();
-                    const isUsed = allWords.some(w => w.word.toLowerCase() === normalizedWord);
+                    // Only mark as duplicate if it was used in a previous round
+                    const isUsed = allWords.some(w =>
+                      w.round < currentRound &&
+                      w.word.toLowerCase() === normalizedWord
+                    );
                     setIsDuplicateWord(isUsed);
                   }}
                   disabled={isReady}
@@ -722,6 +831,58 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
                 It took {currentRound} rounds to get synced!
               </p>
             </div>
+
+            {players.length > 2 && currentRound > 5 && (
+              <div className="space-y-4 bg-gray-50 rounded-lg p-4">
+                <button
+                  onClick={() => setIsStatsExpanded(!isStatsExpanded)}
+                  className="w-full flex items-center justify-between text-left"
+                >
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Game Stats
+                  </h3>
+                  <span className="text-gray-500">
+                    {isStatsExpanded ? '▼' : '▶'}
+                  </span>
+                </button>
+                {isStatsExpanded && (() => {
+                  const stats = calculateEndGameStats();
+                  if (!stats) return null;
+
+                  return (
+                    <div className="space-y-3 text-left">
+                      <div>
+                        <p className="text-sm font-medium text-red-600">Least in Sync</p>
+                        <p className="text-gray-900">
+                          {stats.leastInSync.player?.nickname}
+                          <span className="text-gray-500 text-sm">
+                            {' '} prevented a loss {stats.leastInSync.mismatches} time{stats.leastInSync.mismatches === 1 ? '' : 's'}!
+                          </span>
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-green-600">Most in Sync</p>
+                        <p className="text-gray-900">
+                          {stats.mostInSync.player?.nickname}
+                          <span className="text-gray-500 text-sm">
+                            {' '} synced up with someone {Math.round(stats.mostInSync.matches)} time{Math.round(stats.mostInSync.matches) === 1 ? '' : 's'} total!
+                          </span>
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-blue-600">Best Synced Pair</p>
+                        <p className="text-gray-900">
+                          {stats.bestPair.player1?.nickname} & {stats.bestPair.player2?.nickname}
+                          <span className="text-gray-500 text-sm">
+                            {' '} synced up {Math.round(stats.bestPair.matches)} time{Math.round(stats.bestPair.matches) === 1 ? '' : 's'}!
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gray-900">
                 Word History
