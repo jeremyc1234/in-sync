@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import { ArrowLeft } from 'lucide-react';
+import Confetti from './Confetti';
 
 /** Helper to generate a random 5-character lobby code. */
 function generateLobbyCode() {
@@ -319,7 +320,7 @@ export default function Game({
 
   function handleShareLobby() {
     try {
-      const message = `Join my Word Synced lobby! Use the code ${lobbyCode}.\n\nhttps://wordsynced.com`;
+      const message = `Join my Word Synced lobby! Use the code ${lobbyCode}.\n\nhttps://wordsynced.com/?utm_source=join_lobby&utm_medium=text_message`;
       const encodedMessage = encodeURIComponent(message);
 
       // This opens the default SMS app (works on most mobile devices).
@@ -357,7 +358,7 @@ export default function Game({
   
 They started with the words ${formatPlayerNames(roundOneWords)}.
   
-Try to beat us ➡️ https://wordsynced.com
+Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=text_message
       `.trim();
 
       // 2) Encode the message to safely include spaces, punctuation, etc.
@@ -495,27 +496,39 @@ Try to beat us ➡️ https://wordsynced.com
     // Sort by round descending
     return Object.entries(groupedWords)
       .sort((a, b) => Number(b[0]) - Number(a[0]))
-      .filter(
-        ([round]) => Number(round) < currentRound || allPlayersSubmitted
-      )
-      .map(([round, words]) => (
-        <div key={round} className="mb-4 p-4 bg-gray-50 rounded-lg">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">
-            Round {round}
-          </h4>
-          <div className="space-y-2">
-            {words.map((word, index) => {
-              const player = players.find((p) => p.id === word.player_id);
-              return (
-                <div key={index} className="flex justify-between items-center">
-                  <span className="text-gray-600">{player?.nickname}:</span>
-                  <span className="font-medium text-gray-900">{word.word}</span>
-                </div>
-              );
-            })}
+      .filter(([round]) => Number(round) < currentRound || allPlayersSubmitted)
+      .map(([round, words]) => {
+        // Create a map of word counts to find matches
+        const wordCounts = words.reduce((acc, word) => {
+          const normalizedWord = word.word.toLowerCase();
+          acc[normalizedWord] = (acc[normalizedWord] || 0) + 1;
+          return acc;
+        }, {});
+
+        return (
+          <div key={round} className="mb-4 p-4 bg-gray-50 rounded-lg">
+            <h4 className="text-sm font-medium text-gray-700 mb-2">
+              Round {round}
+            </h4>
+            <div className="space-y-2">
+              {words.map((word, index) => {
+                const player = players.find((p) => p.id === word.player_id);
+                // Word is matching if it appears more than once in this round
+                const isMatching = wordCounts[word.word.toLowerCase()] > 1;
+
+                return (
+                  <div key={index} className="flex justify-between items-center">
+                    <span className="text-gray-600">{player?.nickname}:</span>
+                    <span className={`${isMatching ? 'font-bold text-green-600' : 'font-medium text-gray-900'}`}>
+                      {word.word}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ));
+        );
+      });
   };
 
   // ---------------------------------------------------------
@@ -687,6 +700,7 @@ Try to beat us ➡️ https://wordsynced.com
         {/* Finished Screen */}
         {!playerLeft && gameStatus === 'finished' && (
           <div className="text-center space-y-6">
+            <Confetti />
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
                 Game Over!
