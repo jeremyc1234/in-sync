@@ -51,7 +51,7 @@ export default function Game({
   const [playerLeft, setPlayerLeft] = useState(false);
   const [maxPlayers, setMaxPlayers] = useState(2);
   const [shareButtonText, setShareButtonText] = useState('Share your score with your friends!');
-
+  const [isDuplicateWord, setIsDuplicateWord] = useState(false);
 
   // ---------------------------------------------------------
   // 1) INITIAL DATA FETCH
@@ -670,17 +670,30 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
 
             <div className="space-y-4">
               <div>
-                <label
-                  htmlFor="word"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Enter your word
-                </label>
+                <div className="flex justify-between items-center">
+                  <label
+                    htmlFor="word"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Enter your word
+                  </label>
+                  {isDuplicateWord && (
+                    <span className="text-sm font-medium text-red-600">
+                      This word has already been used
+                    </span>
+                  )}
+                </div>
                 <input
                   type="text"
                   id="word"
                   value={currentWord}
-                  onChange={(e) => setCurrentWord(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCurrentWord(value);
+                    const normalizedWord = value.toLowerCase().trim();
+                    const isUsed = allWords.some(w => w.word.toLowerCase() === normalizedWord);
+                    setIsDuplicateWord(isUsed);
+                  }}
                   disabled={isReady}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-gray-100"
                   placeholder="Type a word..."
