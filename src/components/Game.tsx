@@ -845,7 +845,7 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
             <Confetti />
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                You Got Synced!
+                You Got Synced! 🔄
               </h2>
               <p className="text-lg text-gray-600">
                 It took {currentRound} rounds to get synced!
