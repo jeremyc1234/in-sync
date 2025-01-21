@@ -903,14 +903,34 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
                 })()}
               </div>
             )}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900">
-                Word History
-              </h3>
-              <div className="max-h-60 overflow-y-auto space-y-4">
-                {renderWordHistory()}
+            {allWords.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Word History
+                </h3>
+                <div className="relative">
+                  <div
+                    className="max-h-60 overflow-y-auto space-y-4 pr-2"
+                    onScroll={(e) => {
+                      const div = e.currentTarget;
+                      const atBottom = Math.abs(div.scrollHeight - div.scrollTop - div.clientHeight) <= 1;
+                      // Find the gradient element and toggle its opacity
+                      const gradient = div.nextElementSibling as HTMLElement;
+                      if (gradient) {
+                        gradient.style.opacity = atBottom ? '0' : '1';
+                      }
+                    }}
+                  >
+                    {renderWordHistory()}
+                  </div>
+                  {currentRound > 2 && (
+                    <div
+                      className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-gray-200 to-transparent transition-opacity duration-200"
+                    />
+                  )}
+                </div>
               </div>
-            </div>
+            )}
             <div className="space-y-2">
               {/* "Play Again" now sets wants_to_play_again = true */}
               {!currentPlayer?.wants_to_play_again && (
