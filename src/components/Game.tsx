@@ -576,25 +576,28 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
 
       // For each group of matching words, count matches between players
       Object.values(wordGroups).forEach(playerIds => {
+        // Important: Count matches for ANY matching words, even in final round
         if (playerIds.length > 1) {
-          // For each pair in this group
           playerIds.forEach((p1, i) => {
             playerIds.slice(i + 1).forEach(p2 => {
-              playerMatches[p1][p2]++;
-              playerMatches[p2][p1]++; // Keep this symmetrical for easier lookup
+              if (p1 < p2) { // Ensure each pair is only counted once
+                playerMatches[p1][p2]++;
+              } else {
+                playerMatches[p2][p1]++;
+              }
             });
           });
         }
       });
 
-      // Track mismatches for players whose words didn't match with anyone else
-      const uniqueWords = Object.entries(wordGroups);
-      uniqueWords.forEach(([word, playerIds]) => {
-        if (playerIds.length === 1) {
-          // This player's word didn't match with anyone else
-          playerMismatches[playerIds[0]]++;
-        }
-      });
+      // Track mismatches only for non-final rounds
+      if (roundWords[0].round < currentRound) {
+        Object.entries(wordGroups).forEach(([word, playerIds]) => {
+          if (playerIds.length === 1) {
+            playerMismatches[playerIds[0]]++;
+          }
+        });
+      }
     });
 
     // Find least in sync player (most mismatches)
@@ -605,9 +608,8 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
     let bestPair = { player1: '', player2: '', matches: 0 };
     Object.entries(playerMatches).forEach(([p1, matches]) => {
       Object.entries(matches).forEach(([p2, count]) => {
-        const actualCount = count / 2; // Divide by 2 since we counted both ways
-        if (actualCount > bestPair.matches) {
-          bestPair = { player1: p1, player2: p2, matches: actualCount };
+        if (count > bestPair.matches) {
+          bestPair = { player1: p1, player2: p2, matches: count };
         }
       });
     });
@@ -615,7 +617,7 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
     // Find individual most in sync (divide total matches by 2)
     const playerTotalMatches = Object.entries(playerMatches).map(([playerId, matches]) => ({
       playerId,
-      totalMatches: Object.values(matches).reduce((sum, count) => sum + count, 0) / 2
+      totalMatches: Object.values(matches).reduce((sum, count) => sum + count, 0)
     }));
     const mostInSync = playerTotalMatches.sort((a, b) => b.totalMatches - a.totalMatches)[0];
 
@@ -782,9 +784,11 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
                   >
                     {renderWordHistory()}
                   </div>
-                  <div
-                    className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-gray-200 to-transparent transition-opacity duration-200"
-                  />
+                  {currentRound > 2 && (
+                    <div
+                      className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-gray-200 to-transparent transition-opacity duration-200"
+                    />
+                  )}
                 </div>
               </div>
             )}
@@ -848,7 +852,7 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
               </p>
             </div>
 
-            {players.length > 2 && currentRound > 5 && (
+            {players.length > 2 && currentRound >= 5 && (
               <div className="space-y-4 bg-gray-50 rounded-lg p-4">
                 <button
                   onClick={() => setIsStatsExpanded(!isStatsExpanded)}
@@ -858,7 +862,7 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
                     Game Stats
                   </h3>
                   <span className="text-gray-500">
-                    {isStatsExpanded ? '▼' : '▶'}
+                    {isStatsExpanded ? '▼' : '❌'}
                   </span>
                 </button>
                 {isStatsExpanded && (() => {
@@ -872,7 +876,7 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
                         <p className="text-gray-900">
                           {stats.leastInSync.player?.nickname}
                           <span className="text-gray-500 text-sm">
-                            {' '} prevented a loss {stats.leastInSync.mismatches} time{stats.leastInSync.mismatches === 1 ? '' : 's'}!
+                            {' '} prevented a win {stats.leastInSync.mismatches} time{stats.leastInSync.mismatches === 1 ? '' : 's'}!
                           </span>
                         </p>
                       </div>
