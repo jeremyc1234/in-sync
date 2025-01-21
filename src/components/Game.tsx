@@ -566,45 +566,38 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
       // Skip if not all players submitted
       if (roundWords.length !== players.length) return;
 
-      // For each round, group words by the actual word to find matches
-      const wordGroups = roundWords.reduce((acc, word) => {
-        const normalized = word.word.toLowerCase();
-        if (!acc[normalized]) acc[normalized] = [];
-        acc[normalized].push(word.player_id);
-        return acc;
-      }, {} as Record<string, string[]>);
-
-      // For each group of matching words, count matches between players
-      Object.values(wordGroups).forEach(playerIds => {
-        // Important: Count matches for ANY matching words, even in final round
-        if (playerIds.length > 1) {
-          playerIds.forEach((p1, i) => {
-            playerIds.slice(i + 1).forEach(p2 => {
-              if (p1 < p2) { // Ensure each pair is only counted once
-                playerMatches[p1][p2]++;
-              } else {
-                playerMatches[p2][p1]++;
-              }
-            });
-          });
-        }
+      // Create a map of playerId to their word for easy access
+      const playerWordMap: Record<string, string> = {};
+      roundWords.forEach(word => {
+        playerWordMap[word.player_id] = word.word.toLowerCase().trim();
       });
 
-      // Track mismatches only for non-final rounds
-      if (roundWords[0].round < currentRound) {
-        Object.entries(wordGroups).forEach(([word, playerIds]) => {
-          if (playerIds.length === 1) {
-            playerMismatches[playerIds[0]]++;
+      // Compare each pair of players
+      for (let i = 0; i < players.length; i++) {
+        for (let j = i + 1; j < players.length; j++) {
+          const playerA = players[i];
+          const playerB = players[j];
+          const wordA = playerWordMap[playerA.id];
+          const wordB = playerWordMap[playerB.id];
+
+          if (wordA !== wordB) {
+            // Increment mismatch count for both players
+            playerMismatches[playerA.id] += 1;
+            playerMismatches[playerB.id] += 1;
+          } else {
+            // If words match, increment match count
+            playerMatches[playerA.id][playerB.id] += 1;
+            playerMatches[playerB.id][playerA.id] += 1; // Optional: if you want bidirectional
           }
-        });
+        }
       }
     });
 
     // Find least in sync player (most mismatches)
-    const leastInSync = Object.entries(playerMismatches)
+    const leastInSyncEntry = Object.entries(playerMismatches)
       .sort(([, a], [, b]) => b - a)[0];
 
-    // Find most matching pair (divide by 2 since we counted both directions)
+    // Find most matching pair
     let bestPair = { player1: '', player2: '', matches: 0 };
     Object.entries(playerMatches).forEach(([p1, matches]) => {
       Object.entries(matches).forEach(([p2, count]) => {
@@ -614,7 +607,7 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
       });
     });
 
-    // Find individual most in sync (divide total matches by 2)
+    // Find individual most in sync
     const playerTotalMatches = Object.entries(playerMatches).map(([playerId, matches]) => ({
       playerId,
       totalMatches: Object.values(matches).reduce((sum, count) => sum + count, 0)
@@ -623,8 +616,8 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
 
     return {
       leastInSync: {
-        player: players.find(p => p.id === leastInSync[0]),
-        mismatches: leastInSync[1]
+        player: players.find(p => p.id === leastInSyncEntry[0]),
+        mismatches: leastInSyncEntry[1]
       },
       mostInSync: {
         player: players.find(p => p.id === mostInSync.playerId),

@@ -30,7 +30,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-800 flex items-center justify-center p-4">
       <Toaster position="top-center" />
-      <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-md">
+      <div className="bg-white rounded-xl shadow-xl pt-2 pr-8 pb-8 pl-8 w-full max-w-md">
         <div className="flex items-center justify-center mb-4">
           <img src='/icons/WordSyncedLogo.svg' alt="Word Synced Logo" className="w-20 h-20 mr-2" />
           <h1 className="text-3xl font-bold text-gray-800">Word Synced</h1>
