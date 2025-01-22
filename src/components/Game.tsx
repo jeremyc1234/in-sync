@@ -895,7 +895,7 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
                     Game Stats
                   </h3>
                   <span className="text-gray-500">
-                    {isStatsExpanded ? '▼' : '❌'}
+                    {isStatsExpanded ? '❌' : '▼'}
                   </span>
                 </button>
                 {isStatsExpanded && (() => {
