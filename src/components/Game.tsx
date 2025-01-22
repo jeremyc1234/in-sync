@@ -54,6 +54,8 @@ export default function Game({
   const [isDuplicateWord, setIsDuplicateWord] = useState(false);
   const [isStatsExpanded, setIsStatsExpanded] = useState(true);
   const [submissionTimeout, setSubmissionTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [isRoundTransitioning, setIsRoundTransitioning] = useState(false);
+
 
   // ---------------------------------------------------------
   // 1) INITIAL DATA FETCH
@@ -177,6 +179,8 @@ export default function Game({
           console.log('Lobby updated:', payload);
           setGameStatus(payload.new.game_status);
           setCurrentRound(payload.new.current_round);
+          // Optionally add a slight delay to ensure state consistency
+          setTimeout(() => setIsRoundTransitioning(false), 500);
           if (payload.new.winner) {
             setWinner(payload.new.winner);
           }
@@ -400,9 +404,24 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
 
     const normalizedWord = currentWord.toLowerCase().trim();
 
-    // Check if used in previous rounds
+    // Fetch the latest current_round from the database
+    const { data: lobbyData, error: lobbyError } = await supabase
+      .from('lobbies')
+      .select('current_round')
+      .eq('code', lobbyCode)
+      .single();
+
+    if (lobbyError || !lobbyData) {
+      console.error('Error fetching current round:', lobbyError);
+      toast.error('Failed to fetch current round');
+      return;
+    }
+
+    const latestRound = lobbyData.current_round;
+
+    // Check for duplicate words in the latest round
     const wordUsedInPreviousRounds = allWords.some(
-      (w) => w.round < currentRound && w.word.toLowerCase() === normalizedWord
+      (w) => w.round < latestRound && w.word.toLowerCase() === normalizedWord
     );
     if (wordUsedInPreviousRounds) {
       toast.error('This word has been used in a previous round. Try a different word!');
@@ -415,7 +434,7 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
           lobby_code: lobbyCode,
           player_id: playerId,
           word: normalizedWord,
-          round: currentRound,
+          round: latestRound,
         },
       ]);
 
@@ -856,14 +875,14 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
                     );
                     setIsDuplicateWord(isUsed);
                   }}
-                  disabled={isReady}
+                  disabled={isReady || isRoundTransitioning}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-gray-100"
                   placeholder="Type a word..."
                 />
               </div>
               <button
                 onClick={submitWord}
-                disabled={isReady}
+                disabled={isReady || isRoundTransitioning}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
               >
                 {isReady ? 'Waiting for other players...' : 'Submit Word'}
@@ -909,7 +928,8 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
                         <p className="text-gray-900">
                           {stats.leastInSync.player?.nickname}
                           <span className="text-gray-500 text-sm">
-                            {' '} prevented a win {stats.leastInSync.mismatches} time{stats.leastInSync.mismatches === 1 ? '' : 's'}!
+                            {' '} was in sync the least amount of times!
+                            {/* {' '} prevented a win {stats.leastInSync.mismatches} time{stats.leastInSync.mismatches === 1 ? '' : 's'}! */}
                           </span>
                         </p>
                       </div>
@@ -918,7 +938,8 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
                         <p className="text-gray-900">
                           {stats.mostInSync.player?.nickname}
                           <span className="text-gray-500 text-sm">
-                            {' '} synced up with someone {Math.round(stats.mostInSync.matches)} time{Math.round(stats.mostInSync.matches) === 1 ? '' : 's'} total!
+                            {' '} synced up with someone the most amount of times!
+                            {/* {' '} synced up with someone {Math.round(stats.mostInSync.matches)} time{Math.round(stats.mostInSync.matches) === 1 ? '' : 's'} total! */}
                           </span>
                         </p>
                       </div>
@@ -927,7 +948,8 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
                         <p className="text-gray-900">
                           {stats.bestPair.player1?.nickname} & {stats.bestPair.player2?.nickname}
                           <span className="text-gray-500 text-sm">
-                            {' '} synced up {Math.round(stats.bestPair.matches)} time{Math.round(stats.bestPair.matches) === 1 ? '' : 's'}!
+                            {' '} were the most synced pair!
+                            {/* {' '} synced up {Math.round(stats.bestPair.matches)} time{Math.round(stats.bestPair.matches) === 1 ? '' : 's'}! */}
                           </span>
                         </p>
                       </div>
