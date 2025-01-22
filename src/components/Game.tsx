@@ -103,17 +103,31 @@ export default function Game({
         },
         async (payload) => {
           // Re-fetch the latest players
-          const { data: updatedPlayers } = await supabase
+          const { data: updatedPlayers, error } = await supabase
             .from('players')
             .select('*')
             .eq('lobby_code', lobbyCode);
 
+          if (error) {
+            console.error('Error fetching updated players:', error);
+            return;
+          }
+
           if (updatedPlayers) {
+            console.log('Updated Players:', updatedPlayers);
+
             // Detect if someone left (length decreased)
             if (updatedPlayers.length < players.length) {
-              setPlayerLeft(true);
-              toast.error('A player has left the game');
+              if (gameStatus !== 'waiting') {
+                setPlayerLeft(true);
+                toast.error('A player has left the game.');
+              } else {
+                toast(`A player has left the lobby.`, {
+                  icon: '👋',
+                });
+              }
             }
+
             setPlayers(updatedPlayers);
 
             // Check if the game is finished and no new lobby is created yet
@@ -436,7 +450,12 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
   // ---------------------------------------------------------
   const handleExit = async () => {
     try {
-      await supabase.from('players').delete().eq('id', playerId);
+      // Delete the player from the database
+      const { error } = await supabase.from('players').delete().eq('id', playerId);
+
+      if (error) throw error;
+
+      // Navigate away from the lobby
       onExit();
     } catch (error) {
       console.error('Error leaving game:', error);
@@ -642,7 +661,7 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
           <h1 className="text-3xl font-bold text-gray-800">Word Synced</h1>
         </div>
         {/* Top Bar: Leave + Lobby Code */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-start justify-between mb-6">
           <button
             onClick={handleExit}
             className="text-gray-600 hover:text-gray-900 flex items-center"
@@ -650,9 +669,19 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
             <ArrowLeft className="w-5 h-5 mr-1" />
             Leave
           </button>
-          <div className="text-right">
-            <p className="text-sm font-medium text-gray-900">Lobby Code:</p>
-            <p className="text-3xl font-bold text-blue-600">{lobbyCode}</p>
+          <div className="text-right space-y-2">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Lobby Code:</p>
+              <p className="text-3xl font-bold text-blue-600">{lobbyCode}</p>
+            </div>
+            {gameStatus === 'waiting' && players.length < maxPlayers && (
+              <button
+                onClick={handleShareLobby}
+                className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+              >
+                Share Lobby
+              </button>
+            )}
           </div>
         </div>
 
@@ -673,8 +702,8 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
         )}
 
         {/* If not enough players joined yet */}
-        {!playerLeft && !allPlayersPresent && (
-          <div className="text-center py-8">
+        {!playerLeft && players.length === 1 && (
+          <div className="text-center">
             <h2 className="text-xl font-semibold text-gray-900 mb-2">
               Waiting for players...
             </h2>
@@ -684,23 +713,11 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
             <p className="text-sm text-gray-500 mt-2">
               {players.length} of {maxPlayers} players joined
             </p>
-            {/* Share Lobby button */}
-            <button
-              onClick={handleShareLobby}
-              className="mt-4 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
-            >
-              Share Lobby
-            </button>
-            <img
-              src='/icons/wordsyncedqr.png'
-              alt="WordSynced QR"
-              className="mx-auto mt-4 w-64 h-64"
-            />
           </div>
         )}
 
         {/* Waiting for "Ready to Start" */}
-        {!playerLeft && allPlayersPresent && gameStatus === 'waiting' && (
+        {!playerLeft && players.length >= 2 && gameStatus === 'waiting' && (
           <div className="space-y-6">
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Players</h3>
@@ -723,9 +740,10 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
             {!isReadyToStart ? (
               <button
                 onClick={handleReadyToStart}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                disabled={!allPlayersPresent}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Ready to Start
+                {allPlayersPresent ? 'Ready to Start' : `Waiting for ${maxPlayers - players.length} more player${maxPlayers - players.length === 1 ? '' : 's'}...`}
               </button>
             ) : (
               <div className="text-center text-gray-600">
