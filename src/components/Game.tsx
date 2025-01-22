@@ -53,6 +53,7 @@ export default function Game({
   const [shareButtonText, setShareButtonText] = useState('Share your score with your friends!');
   const [isDuplicateWord, setIsDuplicateWord] = useState(false);
   const [isStatsExpanded, setIsStatsExpanded] = useState(true);
+  const [submissionTimeout, setSubmissionTimeout] = useState<NodeJS.Timeout | null>(null);
 
   // ---------------------------------------------------------
   // 1) INITIAL DATA FETCH
@@ -217,52 +218,37 @@ export default function Game({
           filter: `lobby_code=eq.${lobbyCode}`,
         },
         async () => {
-          const { data } = await supabase
-            .from('words')
-            .select('*')
-            .eq('lobby_code', lobbyCode)
-            .order('round', { ascending: true });
+          try {
+            const { data } = await supabase
+              .from('words')
+              .select('*')
+              .eq('lobby_code', lobbyCode)
+              .order('round', { ascending: true });
 
-          if (data) {
-            console.log('Words updated:', data);
-            setAllWords(data);
-            const currentRoundWords = data.filter((w) => w.round === currentRound);
-            setRoundWords(currentRoundWords);
+            if (data) {
+              console.log('Words updated:', data);
+              setAllWords(data);
+              const currentRoundWords = data.filter((w) => w.round === currentRound);
+              setRoundWords(currentRoundWords);
 
-            // Check if all players submitted in this round
-            if (currentRoundWords.length === players.length) {
-              // check if all words match
-              const allWordsMatch = currentRoundWords.every(
-                (w) =>
-                  w.word.toLowerCase() === currentRoundWords[0].word.toLowerCase()
-              );
+              // Check if all players submitted in this round
+              if (currentRoundWords.length === players.length) {
+                // Use the stored procedure instead of multiple updates
+                const { error } = await supabase.rpc('process_round_completion', {
+                  p_lobby_code: lobbyCode,
+                  p_current_round: currentRound,
+                  p_first_word: currentRoundWords[0].word.toLowerCase()
+                });
 
-              if (allWordsMatch) {
-                // Mark game finished
-                await supabase
-                  .from('lobbies')
-                  .update({
-                    game_status: 'finished',
-                    winner: nickname,
-                    rounds_taken: currentRound,
-                  })
-                  .eq('code', lobbyCode);
-              } else {
-                // Proceed to next round
-                await supabase
-                  .from('lobbies')
-                  .update({
-                    current_round: currentRound + 1,
-                  })
-                  .eq('code', lobbyCode);
-
-                // Reset player ready states
-                await supabase
-                  .from('players')
-                  .update({ ready: false, current_word: null })
-                  .eq('lobby_code', lobbyCode);
+                if (error) {
+                  console.error('Error processing round completion:', error);
+                  toast.error('Error processing round. Please try again.');
+                }
               }
             }
+          } catch (error) {
+            console.error('Error in words subscription:', error);
+            toast.error('Something went wrong. Please try refreshing the page.');
           }
         }
       )
@@ -274,6 +260,7 @@ export default function Game({
       wordsSubscription.unsubscribe();
     };
   }, [lobbyCode, currentRound, players.length, nickname, onJoin]);
+
 
   // ---------------------------------------------------------
   // CREATE NEW LOBBY FOR EVERYONE (called once all have pressed play again)
@@ -649,6 +636,41 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
       }
     };
   };
+
+  // Add this effect to handle timeouts
+  useEffect(() => {
+    // Clear any existing timeout when round changes
+    if (submissionTimeout) {
+      clearTimeout(submissionTimeout);
+    }
+
+    // If we're in a playing state and have submitted
+    if (gameStatus === 'playing' && isReady) {
+      // Set a 10-second timeout
+      const timeout = setTimeout(() => {
+        // Force refresh the game state
+        supabase
+          .from('words')
+          .select('*')
+          .eq('lobby_code', lobbyCode)
+          .order('round', { ascending: true })
+          .then(({ data }) => {
+            if (data) {
+              const currentRoundWords = data.filter((w) => w.round === currentRound);
+              setRoundWords(currentRoundWords);
+            }
+          });
+      }, 10000); // 10 seconds
+
+      setSubmissionTimeout(timeout);
+    }
+
+    return () => {
+      if (submissionTimeout) {
+        clearTimeout(submissionTimeout);
+      }
+    };
+  }, [currentRound, isReady, gameStatus]);
 
   // ---------------------------------------------------------
   // RETURN MAIN JSX
