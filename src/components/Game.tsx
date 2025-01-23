@@ -64,6 +64,7 @@ export default function Game({
   const [isRoundTransitioning, setIsRoundTransitioning] = useState(false);
   const [useTimer, setUseTimer] = useState(false); // To track if timer is enabled
   const [remainingTime, setRemainingTime] = useState<number | null>(null); // To track remaining time
+  const [hasSubmittedThisRound, setHasSubmittedThisRound] = useState(false);
 
   // ---------------------------------------------------------
   // 1) INITIAL DATA FETCH
@@ -359,7 +360,7 @@ export default function Game({
 
   function handleShareLobby() {
     // The text to share
-    const message = `Join my Word Synced lobby! Use the code "${lobbyCode}".\n\nhttps://wordsynced.com/?utm_source=join_lobby&utm_medium=text_message`;
+    const message = `Join my Word Synced lobby! Use the code ${lobbyCode}.\n\nhttps://wordsynced.com/?utm_source=join_lobby&utm_medium=text_message`;
     const encodedMessage = encodeURIComponent(message);
 
     // Check if the browser supports the Web Share API
@@ -441,6 +442,10 @@ export default function Game({
   // SUBMIT WORD
   // ---------------------------------------------------------
   const submitWord = async () => {
+    if (hasSubmittedThisRound || currentPlayer?.ready) {
+      return;
+    }
+    setHasSubmittedThisRound(true);
     if (!currentWord.trim()) {
       toast.error('Please enter a word');
       return;
@@ -773,6 +778,10 @@ export default function Game({
     }
   };
 
+  useEffect(() => {
+    setHasSubmittedThisRound(false);
+  }, [currentRound]);
+
   // ---------------------------------------------------------
   // RETURN MAIN JSX
   // ---------------------------------------------------------
@@ -967,14 +976,14 @@ export default function Game({
                     );
                     setIsDuplicateWord(isUsed);
                   }}
-                  disabled={isReady || isRoundTransitioning}
+                  disabled={isReady || hasSubmittedThisRound || isRoundTransitioning}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-gray-100"
                   placeholder="Type a word..."
                 />
               </div>
               <button
                 onClick={submitWord}
-                disabled={isReady || isRoundTransitioning}
+                disabled={isReady || hasSubmittedThisRound || isRoundTransitioning}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
               >
                 {isReady ? 'Waiting for other players...' : 'Submit Word'}
