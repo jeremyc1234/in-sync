@@ -880,16 +880,6 @@ export default function Game({
               </div>
             </div>
 
-            {/* Timer Display */}
-            {useTimer && remainingTime !== null && (
-              <div className="text-center">
-                <p className="text-lg font-semibold text-red-600">
-                  Time Remaining: {remainingTime} second{remainingTime !== 1 ? 's' : ''}
-                </p>
-              </div>
-            )}
-
-
             {allWords.length > 0 && (
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900">
@@ -918,6 +908,16 @@ export default function Game({
                 </div>
               </div>
             )}
+
+            {/* Timer Display */}
+            {useTimer && remainingTime !== null && (
+              <div className="text-center">
+                <p className="text-lg font-semibold text-red-600">
+                  Time Remaining: {remainingTime} second{remainingTime !== 1 ? 's' : ''}
+                </p>
+              </div>
+            )}
+
 
             <div className="space-y-4">
               <div>
