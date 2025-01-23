@@ -55,7 +55,8 @@ export default function Game({
   const [isStatsExpanded, setIsStatsExpanded] = useState(true);
   const [submissionTimeout, setSubmissionTimeout] = useState<NodeJS.Timeout | null>(null);
   const [isRoundTransitioning, setIsRoundTransitioning] = useState(false);
-
+  const [useTimer, setUseTimer] = useState(false); // To track if timer is enabled
+  const [remainingTime, setRemainingTime] = useState<number | null>(null); // To track remaining time
 
   // ---------------------------------------------------------
   // 1) INITIAL DATA FETCH
@@ -75,6 +76,7 @@ export default function Game({
         setCurrentRound(lobbyData.data.current_round);
         setWinner(lobbyData.data.winner);
         setMaxPlayers(lobbyData.data.max_players);
+        setUseTimer(lobbyData.data.use_timer);
       }
 
       if (wordsData.data) {
@@ -271,14 +273,15 @@ export default function Game({
   // ---------------------------------------------------------
   async function createNewLobbyForEveryone() {
     try {
-      // 1) Fetch old lobby for max_players
-      const { data: oldLobby } = await supabase
+      // 1) Fetch old lobby for max_players and use_timer
+      const { data: oldLobby, error: oldLobbyError } = await supabase
         .from('lobbies')
-        .select('max_players')
+        .select('max_players, use_timer')
         .eq('code', lobbyCode)
         .single();
 
-      if (!oldLobby) {
+      if (oldLobbyError || !oldLobby) {
+        console.error('Error fetching old lobby:', oldLobbyError);
         toast.error('Old lobby not found.');
         return;
       }
@@ -286,11 +289,11 @@ export default function Game({
       // 2) Generate a brand-new code
       const newLobbyCode = generateLobbyCode();
 
-      // 3) Create the new lobby
+      // 3) Create the new lobby with use_timer
       const { error: lobbyError } = await supabase
         .from('lobbies')
         .insert([
-          { code: newLobbyCode, max_players: oldLobby.max_players },
+          { code: newLobbyCode, max_players: oldLobby.max_players, use_timer: oldLobby.use_timer },
         ]);
       if (lobbyError) throw lobbyError;
 
@@ -691,6 +694,44 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
     };
   }, [currentRound, isReady, gameStatus]);
 
+  // timer
+  useEffect(() => {
+    if (useTimer && gameStatus === 'playing') {
+      setRemainingTime(30); // Initialize timer to 30 seconds
+
+      const timerInterval = setInterval(() => {
+        setRemainingTime((prevTime) => {
+          if (prevTime === null) return null;
+          if (prevTime <= 1) {
+            clearInterval(timerInterval);
+            endGameDueToTimer();
+            return null;
+          }
+          return prevTime - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timerInterval);
+    } else {
+      setRemainingTime(null);
+    }
+  }, [currentRound, gameStatus, useTimer]);
+
+  //endgameduetotimer
+  const endGameDueToTimer = async () => {
+    try {
+      await supabase
+        .from('lobbies')
+        .update({ game_status: 'finished' })
+        .eq('code', lobbyCode);
+
+      toast.error('Time is up! Game has ended.');
+    } catch (error) {
+      console.error('Error ending game due to timer:', error);
+      toast.error('Failed to end game due to timer.');
+    }
+  };
+
   // ---------------------------------------------------------
   // RETURN MAIN JSX
   // ---------------------------------------------------------
@@ -816,6 +857,16 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
               </div>
             </div>
 
+            {/* Timer Display */}
+            {useTimer && remainingTime !== null && (
+              <div className="text-center">
+                <p className="text-lg font-semibold text-red-600">
+                  Time Remaining: {remainingTime} second{remainingTime !== 1 ? 's' : ''}
+                </p>
+              </div>
+            )}
+
+
             {allWords.length > 0 && (
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900">
@@ -895,14 +946,28 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
         {!playerLeft && gameStatus === 'finished' && (
           <div className="text-center space-y-6">
             <Confetti />
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                You Got Synced! 🔄
-              </h2>
-              <p className="text-lg text-gray-600">
-                It took {currentRound} rounds to get synced!
-              </p>
-            </div>
+            {winner ? (
+              <>
+                <Confetti />
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                    You Got Synced! 🔄
+                  </h2>
+                  <p className="text-lg text-gray-600">
+                    It took {currentRound} rounds to get synced!
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  You Did Not Get Synced 😞
+                </h2>
+                <p className="text-lg text-gray-600">
+                  You lost after {currentRound} rounds! Try again!
+                </p>
+              </div>
+            )}
 
             {players.length > 2 && currentRound >= 5 && (
               <div className="space-y-4 bg-gray-50 rounded-lg p-4">
