@@ -358,16 +358,27 @@ export default function Game({
   // ---------------------------------------------------------
 
   function handleShareLobby() {
-    try {
-      const message = `Join my Word Synced lobby! Use the code ${lobbyCode}.\n\nhttps://wordsynced.com/?utm_source=join_lobby&utm_medium=text_message`;
-      const encodedMessage = encodeURIComponent(message);
+    // The text to share
+    const message = `Join my Word Synced lobby! Use the code "${lobbyCode}".\n\nhttps://wordsynced.com/?utm_source=join_lobby&utm_medium=text_message`;
+    const encodedMessage = encodeURIComponent(message);
 
-      // This opens the default SMS app (works on most mobile devices).
-      // On desktop browsers, it may do nothing or prompt to select an app.
+    // Check if the browser supports the Web Share API
+    if (navigator.share) {
+      navigator
+        .share({
+          text: message,
+        })
+        .then(() => {
+          toast.success("Shared successfully!");
+        })
+        .catch((err) => {
+          console.error("Error using Web Share API:", err);
+          // If the user cancels or an error occurs, you can show a fallback:
+          window.location.href = `sms:?body=${encodedMessage}`;
+        });
+    } else {
+      // Fall back to using the sms: link
       window.location.href = `sms:?body=${encodedMessage}`;
-    } catch (error) {
-      console.error('Failed to share via SMS:', error);
-      toast.error('Failed to open SMS');
     }
   }
 
