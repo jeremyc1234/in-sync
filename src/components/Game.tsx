@@ -277,7 +277,24 @@ export default function Game({
   // ---------------------------------------------------------
   async function createNewLobbyForEveryone() {
     try {
-      // 1) Fetch old lobby for max_players and use_timer
+      // 1) Attempt to 'lock' the lobby row by setting new_lobby_code to 'LOCKED'
+      //    ONLY if new_lobby_code is currently null. This means we "won" the race.
+      const { data: lockedLobby, error: lockError } = await supabase
+        .from('lobbies')
+        .update({ new_lobby_code: 'LOCKED' })
+        .eq('code', lobbyCode)
+        .is('new_lobby_code', null) // <— important!
+        .select()
+        .single();
+
+      // If we got nothing back, it means another client beat us to it.
+      if (lockError || !lockedLobby) {
+        console.log('Another client already started creating a new lobby. Skipping...');
+        return;
+      }
+
+      // 2) We are now safe to continue. No one else will do this part.
+      //    Fetch the old lobby’s data for max_players, use_timer, etc.
       const { data: oldLobby, error: oldLobbyError } = await supabase
         .from('lobbies')
         .select('max_players, use_timer')
@@ -290,33 +307,35 @@ export default function Game({
         return;
       }
 
-      // 2) Generate a brand-new code
+      // 3) Generate the brand-new code
       const newLobbyCode = generateLobbyCode();
 
-      // 3) Create the new lobby with use_timer
+      // 4) Create the new lobby
       const { error: lobbyError } = await supabase
         .from('lobbies')
         .insert([
-          { code: newLobbyCode, max_players: oldLobby.max_players, use_timer: oldLobby.use_timer },
+          {
+            code: newLobbyCode,
+            max_players: oldLobby.max_players,
+            use_timer: oldLobby.use_timer,
+          },
         ]);
       if (lobbyError) throw lobbyError;
 
-      // 4) Insert all existing players (same nicknames) into the new lobby
+      // 5) Insert all existing players into the new lobby
       const newPlayers = players.map((p) => ({
         lobby_code: newLobbyCode,
         nickname: p.nickname,
       }));
-
-      const { error: insertError } = await supabase
-        .from('players')
-        .insert(newPlayers);
+      const { error: insertError } = await supabase.from('players').insert(newPlayers);
       if (insertError) throw insertError;
 
-      // 5) Update the old lobby’s new_lobby_code so all clients see it
+      // 6) Finally, update the old lobby’s new_lobby_code from 'LOCKED' → our actual code
       const { error: updateError } = await supabase
         .from('lobbies')
         .update({ new_lobby_code: newLobbyCode })
-        .eq('code', lobbyCode);
+        .eq('code', lobbyCode)
+        .eq('new_lobby_code', 'LOCKED'); // only if we still hold the lock
 
       if (updateError) throw updateError;
 
