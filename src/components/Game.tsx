@@ -10,6 +10,13 @@ function generateLobbyCode() {
   return Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
+function getTimerColor(remaining: number | null) {
+  if (remaining === null) return '';
+  if (remaining > 20) return 'text-black';
+  if (remaining > 10) return 'text-yellow-500';
+  return 'text-red-600';
+}
+
 interface GameProps {
   lobbyCode: string;
   playerId: string;
@@ -911,8 +918,8 @@ export default function Game({
 
             {/* Timer Display */}
             {useTimer && remainingTime !== null && (
-              <div className="text-center">
-                <p className="text-lg font-semibold text-red-600">
+              <div className="text-center transition-colors duration-500">
+                <p className={`text-lg font-semibold ${getTimerColor(remainingTime)}`}>
                   Time Remaining: {remainingTime} second{remainingTime !== 1 ? 's' : ''}
                 </p>
               </div>
