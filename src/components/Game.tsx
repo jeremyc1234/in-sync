@@ -181,8 +181,12 @@ export default function Game({
           console.log('Lobby updated:', payload);
           setGameStatus(payload.new.game_status);
           setCurrentRound(payload.new.current_round);
-          // Optionally add a slight delay to ensure state consistency
-          setTimeout(() => setIsRoundTransitioning(false), 500);
+          // If the round advanced, end the "transition" after a short delay
+          if (payload.old.current_round < payload.new.current_round) {
+            setTimeout(() => {
+              setIsRoundTransitioning(false);
+            }, 1000);
+          }
           if (payload.new.winner) {
             setWinner(payload.new.winner);
           }
@@ -363,12 +367,12 @@ export default function Game({
       const roundOneWords = allWords.filter((w) => w.round === 1).map((w) => w.word);
 
       const shareMessage = `
-  Word Synced: ${formatPlayerNames(names)} guessed the same word "${finalWord}" in ${currentRound} rounds! 🎉
-  
-We started with the words ${formatPlayerNames(roundOneWords)}.
-  
-Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=text_message
-      `.trim();
+    Word Synced: ${formatPlayerNames(names)} guessed the same word "${finalWord}" in ${currentRound} rounds! 🎉
+    
+  We started with the words ${formatPlayerNames(roundOneWords)}.
+    
+  Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=text_message
+        `.trim();
 
       // 2) Encode the message to safely include spaces, punctuation, etc.
       const encodedMessage = encodeURIComponent(shareMessage);
@@ -437,7 +441,7 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
           lobby_code: lobbyCode,
           player_id: playerId,
           word: normalizedWord,
-          round: latestRound,
+          round: currentRound,
         },
       ]);
 
@@ -933,7 +937,7 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
               </div>
               <button
                 onClick={submitWord}
-                disabled={isReady}
+                disabled={isReady || isRoundTransitioning}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
               >
                 {isReady ? 'Waiting for other players...' : 'Submit Word'}
@@ -945,7 +949,6 @@ Try to beat us ➡️ https://wordsynced.com?utm_source=share_score&utm_medium=t
         {/* Finished Screen */}
         {!playerLeft && gameStatus === 'finished' && (
           <div className="text-center space-y-6">
-            <Confetti />
             {winner ? (
               <>
                 <Confetti />
