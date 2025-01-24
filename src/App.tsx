@@ -28,7 +28,7 @@ function App() {
     );
   }
   return (
-    <div className="min-h-screen bg-gray-800 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-animated-gradient flex items-center justify-center p-4">
       <Toaster position="top-center" />
       <div className="bg-white rounded-xl shadow-xl pt-2 pr-8 pb-8 pl-8 w-full max-w-md">
         <div className="flex items-center justify-center mb-4">
