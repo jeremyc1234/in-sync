@@ -77,7 +77,9 @@ export default function Game({
         supabase.from('words').select('*').eq('lobby_code', lobbyCode).order('round', { ascending: true }),
       ]);
 
-      if (playersData.data) setPlayers(playersData.data);
+      if (playersData.data) {
+        setPlayers(playersData.data.sort((a, b) => a.nickname.localeCompare(b.nickname)));
+      }
 
       if (lobbyData.data) {
         setGameStatus(lobbyData.data.game_status);
@@ -88,11 +90,15 @@ export default function Game({
       }
 
       if (wordsData.data) {
-        setAllWords(wordsData.data);
-        const currentRoundWords = wordsData.data.filter(
-          (w) => w.round === (lobbyData.data?.current_round || 1)
+        setAllWords(
+          wordsData.data.sort((a, b) => {
+            const playerA = players.find((p) => p.id === a.player_id);
+            const playerB = players.find((p) => p.id === b.player_id);
+            return playerA && playerB
+              ? playerA.nickname.localeCompare(playerB.nickname)
+              : 0;
+          })
         );
-        setRoundWords(currentRoundWords);
       }
     };
 
@@ -586,20 +592,31 @@ export default function Game({
               Round {round}
             </h4>
             <div className="space-y-2">
-              {words.map((word, index) => {
-                const player = players.find((p) => p.id === word.player_id);
-                // Word is matching if it appears more than once in this round
-                const isMatching = wordCounts[word.word.toLowerCase()] > 1;
+              {[...words]
+                .sort((a, b) => {
+                  const playerA = players.find((p) => p.id === a.player_id);
+                  const playerB = players.find((p) => p.id === b.player_id);
+                  return playerA && playerB
+                    ? playerA.nickname.localeCompare(playerB.nickname) // Sort alphabetically by nickname
+                    : 0;
+                })
+                .map((word, index) => {
+                  const player = players.find((p) => p.id === word.player_id);
+                  // Word is matching if it appears more than once in this round
+                  const isMatching = wordCounts[word.word.toLowerCase()] > 1;
 
-                return (
-                  <div key={index} className="flex justify-between items-center">
-                    <span className="text-gray-600">{player?.nickname}:</span>
-                    <span className={`${isMatching ? 'font-bold text-green-600' : 'font-medium text-gray-900'}`}>
-                      {word.word}
-                    </span>
-                  </div>
-                );
-              })}
+                  return (
+                    <div key={index} className="flex justify-between items-center">
+                      <span className="text-gray-600">{player?.nickname}:</span>
+                      <span
+                        className={`${isMatching ? 'font-bold text-green-600' : 'font-medium text-gray-900'
+                          }`}
+                      >
+                        {word.word}
+                      </span>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         );
@@ -854,19 +871,21 @@ export default function Game({
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Players</h3>
               <div className="space-y-2">
-                {players.map((player) => (
-                  <div
-                    key={player.id}
-                    className="flex items-center justify-between"
-                  >
-                    <span className="text-gray-900">{player.nickname}</span>
-                    {player.ready_to_start ? (
-                      <span className="text-green-600 font-bold text-md">Ready</span>
-                    ) : (
-                      <span className="text-red-400 font-bold text-md">Not Ready</span>
-                    )}
-                  </div>
-                ))}
+                {[...players]
+                  .sort((a, b) => a.nickname.localeCompare(b.nickname)) // Sorting by nickname (or use another attribute like `id`)
+                  .map((player) => (
+                    <div
+                      key={player.id}
+                      className="flex items-center justify-between"
+                    >
+                      <span className="text-gray-900">{player.nickname}</span>
+                      {player.ready_to_start ? (
+                        <span className="text-green-600 font-bold text-md">Ready</span>
+                      ) : (
+                        <span className="text-red-400 font-bold text-md">Not Ready</span>
+                      )}
+                    </div>
+                  ))}
               </div>
             </div>
             {!isReadyToStart ? (
