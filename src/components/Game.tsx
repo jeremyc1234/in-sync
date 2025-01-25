@@ -66,7 +66,41 @@ export default function Game({
   const [remainingTime, setRemainingTime] = useState<number | null>(null); // To track remaining time
   const [hasSubmittedThisRound, setHasSubmittedThisRound] = useState(false);
   const [roundLimit, setRoundLimit] = useState<number | null>(null);
+  const TOPICS = [
+    'Movies',
+    'Weather',
+    'Pop Culture',
+    'Animals',
+    'Food',
+    'Sports',
+    'Travel',
+    'Technology',
+    'Books',
+    'Music',
+    'History',
+    'Science',
+    'Geography',
+    'Art',
+    'Fashion',
+    'Hobbies',
+    'TV Shows',
+    'Celebrities',
+    'Vehicles',
+    'School',
+    'Nature',
+    'Health',
+    'Fitness',
+    'Video Games',
+    'Space',
+    'Cooking',
+    'Holidays',
+    'Jobs',
+    'Emotions'
+  ];
+  const [shuffledTopics] = useState(() => shuffle([...TOPICS]));
+  const [topicIndex, setTopicIndex] = useState(-1);
 
+  const [suggestedTopic, setSuggestedTopic] = useState('');
   // ---------------------------------------------------------
   // 1) INITIAL DATA FETCH
   // ---------------------------------------------------------
@@ -300,7 +334,24 @@ export default function Game({
       wordsSubscription.unsubscribe();
     };
   }, [lobbyCode, currentRound, players.length, nickname, onJoin]);
+  // ---------------------------------------------------------
+  // SHUFFLE TOPICS
+  // ---------------------------------------------------------
 
+  function shuffle<T>(array: T[]): T[] {
+    const copy = [...array];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+
+  useEffect(() => {
+    if (gameStatus === 'waiting') {
+      setTopicIndex(prev => (prev + 1) % shuffledTopics.length);
+    }
+  }, [gameStatus, shuffledTopics.length]);
 
   // ---------------------------------------------------------
   // CREATE NEW LOBBY FOR EVERYONE (called once all have pressed play again)
@@ -414,6 +465,14 @@ export default function Game({
     if (names.length === 2) return names.join(' and ');
     return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
   }
+
+  useEffect(() => {
+    if (gameStatus === 'waiting') {
+      const randomTopic = TOPICS[Math.floor(Math.random() * TOPICS.length)];
+      setSuggestedTopic(randomTopic);
+    }
+  }, [gameStatus]);
+
 
   // ---------------------------------------------------------
   // SHARE SCORE
@@ -884,6 +943,20 @@ export default function Game({
         {/* Waiting for "Ready to Start" */}
         {!playerLeft && players.length >= 2 && gameStatus === 'waiting' && (
           <div className="space-y-6">
+            {topicIndex >= 0 && (
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-md text-blue-800">
+                  <p>Need help thinking of a starting point?</p>
+                  <p className="mt-1">
+                    What about something to do with{" "}
+                    <span className="font-semibold text-blue-800">
+                      {shuffledTopics[topicIndex]}
+                    </span>?
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Players</h3>
               <div className="space-y-2">
