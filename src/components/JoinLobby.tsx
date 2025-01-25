@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -10,6 +10,16 @@ export default function JoinLobby({ onJoin }: JoinLobbyProps) {
   const [lobbyCode, setLobbyCode] = useState('');
   const [nickname, setNickname] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isLobbyFromURL, setIsLobbyFromURL] = useState(false);
+
+  useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search);
+    const lobbyParam = queryParams.get('lobby');
+    if (lobbyParam) {
+      setLobbyCode(lobbyParam.toUpperCase());
+      setIsLobbyFromURL(true);
+    }
+  }, []);
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();

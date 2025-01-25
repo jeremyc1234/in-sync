@@ -382,7 +382,7 @@ export default function Game({
 
   function handleShareLobby() {
     // The text to share
-    const message = `Join my Word Synced lobby! Use the code ${lobbyCode}.\n\nhttps://wordsynced.com/?utm_source=join_lobby&utm_medium=text_message`;
+    const message = `Join my Word Synced lobby!\n\nhttps://wordsynced.com/?lobby=${lobbyCode}&utm_source=referral&utm_medium=text_message`;
     const encodedMessage = encodeURIComponent(message);
 
     // Check if the browser supports the Web Share API
