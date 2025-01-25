@@ -945,11 +945,11 @@ export default function Game({
           <div className="space-y-6">
             {topicIndex >= 0 && (
               <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-md text-blue-800">
-                  <p>Need help thinking of a starting point?</p>
+                <div className="text-md text-blue-500">
+                  <p>Need help thinking of a starting word?</p>
                   <p className="mt-1">
                     What about something to do with{" "}
-                    <span className="font-semibold text-blue-800">
+                    <span className="font-semibold text-blue-600">
                       {shuffledTopics[topicIndex]}
                     </span>?
                   </p>
