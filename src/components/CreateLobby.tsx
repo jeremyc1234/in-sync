@@ -18,6 +18,7 @@ export default function CreateLobby({ onJoin }: CreateLobbyProps) {
   const [loading, setLoading] = useState(false);
   const [createdLobbyCode, setCreatedLobbyCode] = useState<string | null>(null);
   const [useTimer, setUseTimer] = useState(false);
+  const [roundLimit, setRoundLimit] = useState(0);
 
   useEffect(() => {
     if (createdLobbyCode) {
@@ -71,14 +72,21 @@ export default function CreateLobby({ onJoin }: CreateLobbyProps) {
     const lobbyCode = generateLobbyCode();
 
     try {
-      // Create lobby
+      // 1) Create the new lobby with the chosen roundLimit
       const { error: lobbyError } = await supabase
         .from('lobbies')
-        .insert([{ code: lobbyCode, max_players: maxPlayers, use_timer: useTimer }]);
+        .insert([
+          {
+            code: lobbyCode,
+            max_players: maxPlayers,
+            use_timer: useTimer,
+            round_limit: roundLimit, // Storing the round limit here
+          },
+        ]);
 
       if (lobbyError) throw lobbyError;
 
-      // Create player
+      // 2) Create the current player's record
       const { data: playerData, error: playerError } = await supabase
         .from('players')
         .insert([{ lobby_code: lobbyCode, nickname }])
@@ -89,6 +97,7 @@ export default function CreateLobby({ onJoin }: CreateLobbyProps) {
 
       setCreatedLobbyCode(lobbyCode);
       onJoin(lobbyCode, playerData.id, nickname);
+
       toast.success('Lobby created! Share the code with your friends.');
     } catch (error) {
       console.error('Error creating lobby:', error);
@@ -147,6 +156,24 @@ export default function CreateLobby({ onJoin }: CreateLobbyProps) {
             />
           </button>
         </div>
+      </div>
+      <div>
+        <label htmlFor="round-limit" className="block text-sm font-medium text-gray-700">
+          Round Limit
+        </label>
+        <select
+          id="round-limit"
+          value={roundLimit}
+          onChange={(e) => setRoundLimit(Number(e.target.value))}
+          className="block w-full pr-3 py-2 text-base border-gray-300 
+                     focus:outline-none focus:ring-green-500 focus:border-green-500
+                     sm:text-sm rounded-md"
+        >
+          <option value={0}>Unlimited</option>
+          <option value={5}>5 Rounds</option>
+          <option value={10}>10 Rounds</option>
+          <option value={20}>20 Rounds</option>
+        </select>
       </div>
       <button
         type="submit"

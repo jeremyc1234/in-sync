@@ -65,6 +65,7 @@ export default function Game({
   const [useTimer, setUseTimer] = useState(false); // To track if timer is enabled
   const [remainingTime, setRemainingTime] = useState<number | null>(null); // To track remaining time
   const [hasSubmittedThisRound, setHasSubmittedThisRound] = useState(false);
+  const [roundLimit, setRoundLimit] = useState<number | null>(null);
 
   // ---------------------------------------------------------
   // 1) INITIAL DATA FETCH
@@ -87,6 +88,7 @@ export default function Game({
         setWinner(lobbyData.data.winner);
         setMaxPlayers(lobbyData.data.max_players);
         setUseTimer(lobbyData.data.use_timer);
+        setRoundLimit(lobbyData.data.round_limit ?? 0);
       }
 
       if (wordsData.data) {
@@ -203,6 +205,20 @@ export default function Game({
           }
           if (payload.new.winner) {
             setWinner(payload.new.winner);
+          }
+
+          if (
+            payload.new.round_limit > 0 &&
+            payload.new.current_round > payload.new.round_limit &&
+            payload.new.game_status !== 'finished'
+          ) {
+            // Force game to finish
+            await supabase
+              .from('lobbies')
+              .update({ game_status: 'finished' })
+              .eq('code', lobbyCode);
+
+            toast.error('Maximum number of rounds reached. Game has ended!');
           }
 
           // If new_lobby_code is set => the new lobby was just created
@@ -1032,7 +1048,9 @@ export default function Game({
                   You Did Not Get Synced 😞
                 </h2>
                 <p className="text-lg text-gray-600">
-                  You lost after {currentRound} rounds! Try again!
+                  {roundLimit && roundLimit > 0 && currentRound > roundLimit
+                    ? `Game ended after reaching ${roundLimit} rounds.`
+                    : `You lost after ${currentRound} rounds! Try again!`}
                 </p>
               </div>
             )}
