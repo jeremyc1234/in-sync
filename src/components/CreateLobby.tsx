@@ -141,7 +141,7 @@ export default function CreateLobby({ onJoin }: CreateLobbyProps) {
           </select>
         </div>
         <div className="w-1/3 flex flex-col items-end">
-          <label className="block text-sm font-medium text-gray-700 mb-3">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
             Timed Rounds
           </label>
           <button
