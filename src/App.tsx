@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import CreateLobby from './components/CreateLobby';
 import JoinLobby from './components/JoinLobby';
 import Game from './components/Game';
+import RecentMatches from './components/RecentMatches';
 
 function App() {
   const [gameState, setGameState] = useState<{
@@ -74,6 +75,10 @@ function App() {
             </div>
           </div>
           <JoinLobby onJoin={handleJoinGame} />
+        </div>
+
+        <div className="mt-8">
+          <RecentMatches />
         </div>
       </div>
 
