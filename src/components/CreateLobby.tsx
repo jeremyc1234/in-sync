@@ -158,22 +158,25 @@ export default function CreateLobby({ onJoin }: CreateLobbyProps) {
         </div>
       </div>
       <div>
-        <label htmlFor="round-limit" className="block text-sm font-medium text-gray-700">
-          Round Limit
-        </label>
-        <select
-          id="round-limit"
-          value={roundLimit}
-          onChange={(e) => setRoundLimit(Number(e.target.value))}
-          className="block w-full pr-3 py-2 text-base border-gray-300 
-                     focus:outline-none focus:ring-green-500 focus:border-green-500
-                     sm:text-sm rounded-md"
-        >
-          <option value={0}>Unlimited</option>
-          <option value={5}>5 Rounds</option>
-          <option value={10}>10 Rounds</option>
-          <option value={20}>20 Rounds</option>
-        </select>
+        <div className="flex items-center justify-between">
+          <label htmlFor="round-limit" className="block text-sm font-medium text-gray-700">
+            Round Limit
+          </label>
+          <select
+            id="round-limit"
+            value={roundLimit}
+            onChange={(e) => setRoundLimit(Number(e.target.value))}
+            className="block w-40 pr-3 py-2 text-base border-2 border-gray-300 
+                     focus:outline-none focus:ring-green-500 focus:border-gray-300
+                     sm:text-sm rounded-full text-center appearance-none"
+            style={{ backgroundImage: 'url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3E%3Cpath stroke=\'%236B7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3E%3C/svg%3E")', backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
+          >
+            <option value={0}><span className="text-xxl">∞</span></option>
+            <option value={5}>5 Rounds</option>
+            <option value={10}>10 Rounds</option>
+            <option value={20}>20 Rounds</option>
+          </select>
+        </div>
       </div>
       <button
         type="submit"
