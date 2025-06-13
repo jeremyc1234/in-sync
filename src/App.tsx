@@ -13,6 +13,8 @@ function App() {
     nickname?: string;
   }>({});
   const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const [isCreateMode, setIsCreateMode] = useState(true);
+
   const handleJoinGame = (lobbyCode: string, playerId: string, nickname: string) => {
     setGameState({ lobbyCode, playerId, nickname });
   };
@@ -24,14 +26,15 @@ function App() {
         playerId={gameState.playerId}
         nickname={gameState.nickname!}
         onExit={() => setGameState({})}
-        onJoin={handleJoinGame} // <-- pass the same join logic down
+        onJoin={handleJoinGame}
       />
     );
   }
+
   return (
     <div className="min-h-screen bg-animated-gradient flex items-center justify-center p-4">
       <Toaster position="top-center" />
-      <div className="bg-white rounded-xl shadow-xl pt-2 pr-8 pb-8 pl-8 w-full max-w-md">
+      <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-md">
         <div className="flex items-center justify-center mb-4">
           <img src='/icons/WordSyncedLogo.svg' alt="Word Synced Logo" className="w-20 h-20 mr-2" />
           <h1 className="text-3xl font-bold text-gray-800">Word Synced</h1>
@@ -64,24 +67,39 @@ function App() {
           </div>
         )}
 
-        <div className="space-y-6">
-          <CreateLobby onJoin={handleJoinGame} />
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">or</span>
-            </div>
+        <div className="flex justify-center mb-6">
+          <div className="bg-gray-100 p-1 rounded-lg">
+            <button
+              onClick={() => setIsCreateMode(true)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                isCreateMode ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              Create Lobby
+            </button>
+            <button
+              onClick={() => setIsCreateMode(false)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                !isCreateMode ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              Join Lobby
+            </button>
           </div>
-          <JoinLobby onJoin={handleJoinGame} />
+        </div>
+
+        <div className="space-y-6">
+          {isCreateMode ? (
+            <CreateLobby onJoin={handleJoinGame} />
+          ) : (
+            <JoinLobby onJoin={handleJoinGame} />
+          )}
         </div>
 
         <div className="mt-8">
           <RecentMatches />
         </div>
       </div>
-
     </div>
   );
 }
