@@ -166,9 +166,7 @@ export default function CreateLobby({ onJoin }: CreateLobbyProps) {
             id="round-limit"
             value={roundLimit}
             onChange={(e) => setRoundLimit(Number(e.target.value))}
-            className="block w-32 pr-3 py-2 text-base border-gray-300 
-                     focus:outline-none focus:ring-green-500 focus:border-green-500
-                     sm:text-sm rounded-md text-center"
+            className="block w-32 pr-3 py-2 text-base text-center border-gray-300 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm rounded-md"
           >
             <option value={0}>∞</option>
             <option value={5}>5 Rounds</option>
