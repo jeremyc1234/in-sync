@@ -375,7 +375,7 @@ export default function Game({
       }
 
       // 2) We are now safe to continue. No one else will do this part.
-      //    Fetch the old lobby’s data for max_players, use_timer, etc.
+      //    Fetch the old lobby's data for max_players, use_timer, etc.
       const { data: oldLobby, error: oldLobbyError } = await supabase
         .from('lobbies')
         .select('max_players, use_timer')
@@ -411,7 +411,7 @@ export default function Game({
       const { error: insertError } = await supabase.from('players').insert(newPlayers);
       if (insertError) throw insertError;
 
-      // 6) Finally, update the old lobby’s new_lobby_code from 'LOCKED' → our actual code
+      // 6) Finally, update the old lobby's new_lobby_code from 'LOCKED' → our actual code
       const { error: updateError } = await supabase
         .from('lobbies')
         .update({ new_lobby_code: newLobbyCode })
@@ -433,7 +433,7 @@ export default function Game({
 
   function handleShareLobby() {
     // The text to share
-    const message = `Join my Word Synced lobby!\n\nhttps://wordsynced.com/?lobby=${lobbyCode}&utm_source=referral&utm_medium=text_message`;
+    const message = `Join my Word Synced lobby!\n\nhttps://wordsynced.com?lobby=${lobbyCode}`;
     const encodedMessage = encodeURIComponent(message);
 
     // Check if the browser supports the Web Share API
@@ -621,7 +621,7 @@ export default function Game({
   // ---------------------------------------------------------
   const handleCreateNewLobby = async () => {
     try {
-      // We’ll reuse your existing "handleExit" logic to go back to menu
+      // We'll reuse your existing "handleExit" logic to go back to menu
       await handleExit();
       onExit();
     } catch (error) {
@@ -883,6 +883,12 @@ export default function Game({
         <div className="flex items-center justify-center mb-4">
           <img src='/icons/WordSyncedLogo.svg' alt="Word Synced Logo" className="w-20 h-20 mr-2" />
           <h1 className="text-3xl font-bold text-gray-800">Word Synced</h1>
+        </div>
+        {/* Warning Message */}
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-sm text-yellow-800">
+            ⚠️ Please don't refresh or leave this page, or you'll be disconnected from the game!
+          </p>
         </div>
         {/* Top Bar: Leave + Lobby Code */}
         <div className="flex items-start justify-between mb-6">
